@@ -12,12 +12,12 @@
 
 ## Процедуры
 
-Читай подходящий skill, затем только материалы, необходимые для задачи:
+Единственный каталог процедур — `skills/` в корне проекта. Перед выполнением задачи открой подходящий `skills/<name>/SKILL.md` по ссылкам ниже, затем только материалы, необходимые для задачи. Копии skills в каталогах приложений не используются:
 
-- [qa-run-tests](.agents/skills/qa-run-tests/SKILL.md) — выполнить выбранные тесты и проверить результат запуска.
-- [qa-debug-test](.agents/skills/qa-debug-test/SKILL.md) — исследовать падение или нестабильность.
-- [qa-write-test](.agents/skills/qa-write-test/SKILL.md) — добавить проверку согласованного поведения.
-- [qa-coverage-audit](.agents/skills/qa-coverage-audit/SKILL.md) — сопоставить требования с проверками и составить план покрытия.
+- [qa-run-tests](skills/qa-run-tests/SKILL.md) — выполнить выбранные тесты и проверить результат запуска.
+- [qa-debug-test](skills/qa-debug-test/SKILL.md) — исследовать падение или нестабильность.
+- [qa-write-test](skills/qa-write-test/SKILL.md) — добавить проверку согласованного поведения.
+- [qa-coverage-audit](skills/qa-coverage-audit/SKILL.md) — сопоставить требования с проверками и составить план покрытия.
 
 Выбор уровня проверки и смысл покрытия описаны в [testing.md](docs/qa/testing.md).
 Подключение и проверка самого harness — в [harness-checks.md](docs/qa/harness-checks.md).

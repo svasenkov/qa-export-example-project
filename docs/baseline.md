@@ -40,10 +40,10 @@ npm run build
 
 Отчёт baseline записан JSON-репортёром. Генерация Allure этим запуском не подтверждена.
 
-Из корня:
+Из корня (команда проверки harness ниже обновлена после удаления адаптера; исторический запуск использовал прежний инструмент синхронизации):
 
 ```bash
-python3 tools/sync_adapters.py --check
+python3 -B tools/check_harness.py
 python3 -B -m unittest discover -s tools -p 'test_*.py'
 docker compose -p qa-diploma --env-file .env.diploma.example config --quiet
 ```

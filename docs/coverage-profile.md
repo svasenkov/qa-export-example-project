@@ -51,9 +51,6 @@ load:
   module: ''
 harness:
   agents:
-    cline:
-      access: write
-      module: .clinerules
     cursor:
       access: write
       module: AGENTS.md
