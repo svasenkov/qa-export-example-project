@@ -8,7 +8,7 @@
 - Integration отдельно: `TestPostgresItems`, `TestPostgresUsers`, `TestPostgresSeedIsIdempotent` прошли на новой одноразовой БД PostgreSQL. Созданный контейнер затем остановлен и автоматически удалён. Другие локальные базы не использовались.
 - Frontend component: 83 проверки прошли, пропусков и падений нет.
 - Frontend: проверка типов и production-сборка завершились с exit code 0.
-- Harness: 7 unit-тестов инструмента синхронизации прошли; проверка metadata, локальных ссылок harness и совпадения адаптеров прошла.
+- Историческая проверка harness: 7 unit-тестов инструмента синхронизации прошли; проверка metadata, локальных ссылок harness и совпадения адаптеров прошла. Эти инструменты впоследствии удалены из проекта и CI; результат сохранён только как запись исходного запуска.
 - Compose: `docker compose -p qa-diploma --env-file .env.diploma.example config --quiet` прошёл. Это проверка конфигурации; приложение через этот новый Compose-проект пока не запускалось.
 
 Java API/UI/E2E, CI, ручные проверки и поведение skills в отдельной сессии агента в этом запуске не проверялись. Процент покрытия требований не вычислялся: перечень требований полной версии ещё не утверждён.
@@ -40,11 +40,9 @@ npm run build
 
 Отчёт baseline записан JSON-репортёром. Генерация Allure этим запуском не подтверждена.
 
-Из корня (команда проверки harness ниже обновлена после удаления адаптера; исторический запуск использовал прежний инструмент синхронизации):
+Из корня, проверка Compose:
 
 ```bash
-python3 -B tools/check_harness.py
-python3 -B -m unittest discover -s tools -p 'test_*.py'
 docker compose -p qa-diploma --env-file .env.diploma.example config --quiet
 ```
 

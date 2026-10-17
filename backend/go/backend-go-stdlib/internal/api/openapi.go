@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-// Module copy of _contract/openapi.yaml and the Swagger UI that points at it.
+// Module copy of docs/api/openapi.yaml and the Swagger UI that points at it.
 // Not swag/codegen — the yaml is SSOT.
 //
 //go:embed openapi.yaml

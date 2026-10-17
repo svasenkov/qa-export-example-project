@@ -3,9 +3,9 @@ info:
   title: autotests-ai-multistack-app API
   version: 0.1.0
   description: |
-    Shared contract of this cell — detailed flows in `_contract/flows/login.md`.
-    SSOT implementation: `backend/go/backend-go-stdlib` (Go stdlib, `net/http`).
-    Auth endpoints: login, register, logout, profile, self-delete — see `flows/login.md`.
+    Shared HTTP contract of this cell — behavior specs in `openspec/specs/` (repository root).
+    Backend implementation: `backend/go/backend-go-stdlib` (Go stdlib, `net/http`).
+    Auth endpoints: login, register, logout, profile, self-delete — see `openspec/README.md` (repository root).
 
 servers:
   - url: http://localhost:8831
@@ -219,4 +219,4 @@ tags:
   - name: items
     description: Demo CRUD/read API
   - name: auth
-    description: Authentication per flows/login.md
+    description: Authentication per openspec/specs/ (repository root)

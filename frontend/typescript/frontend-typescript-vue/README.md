@@ -56,6 +56,11 @@ Delete account asks `window.confirm('Delete this account? This cannot be undone.
 cancel sends no request. Both calls are best effort and both drop the local token even when
 the API fails — a token the server has already rejected must never keep the UI signed in.
 
+## Спецификации и UI-соглашения
+
+Поведение — в [OpenSpec](../../../openspec/README.md). Атрибуты форм и сведения
+о подключении дизайн-системы — в [auth-ui.md](docs/auth-ui.md).
+
 ## Contracts preserved for Selenide
 
 - Every `data-testid` used by `tests/.../pages/*.java`.
@@ -98,3 +103,9 @@ module: on Node 26 the runtime's own empty `localStorage` global wins over the j
 | `public/icons/pwa-*.png` | Install + apple-touch (`icons/pwa-192.png`) |
 
 SW registered in `src/pwa/registerServiceWorker.ts` under the Vite base path.
+
+## Allure
+
+Vitest пишет результаты в `allure-results/`. HTML-отчёт использует общий
+[tools/allure](../../../tools/allure/README.md) через локальный
+[allurerc.mjs](allurerc.mjs). Отдельная копия конфигурации и CLI не нужна.

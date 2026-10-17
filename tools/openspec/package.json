@@ -1,0 +1,16 @@
+{
+  "name": "project-openspec",
+  "private": true,
+  "description": "Pinned OpenSpec CLI for this QA project",
+  "type": "module",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "openspec": "node cli.mjs",
+    "validate": "node cli.mjs validate --all --strict --no-interactive"
+  },
+  "dependencies": {
+    "@fission-ai/openspec": "1.14.3"
+  }
+}

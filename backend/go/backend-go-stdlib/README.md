@@ -1,6 +1,6 @@
 # backend-go-stdlib
 
-Go API на `net/http` с PostgreSQL. Версия Go и зависимости — в [go.mod](go.mod). Маршруты — в [router.go](internal/api/router.go), контракт модуля — в [openapi.yaml](internal/api/openapi.yaml). Общий контракт сборки находится в [_contract/openapi.yaml](../../../_contract/openapi.yaml); при расхождении контрактов и реализации сначала установите ожидаемое поведение.
+Go API на `net/http` с PostgreSQL. Версия Go и зависимости — в [go.mod](go.mod). Маршруты — в [router.go](internal/api/router.go), контракт модуля — в [openapi.yaml](internal/api/openapi.yaml). Общий контракт сборки находится в [docs/api/openapi.yaml](../../../docs/api/openapi.yaml); при расхождении контрактов и реализации сначала установите ожидаемое поведение.
 
 ## Unit
 
@@ -19,6 +19,12 @@ go test -count=1 -v ./internal/security -run '^TestCredentialsValidate$'
 ```
 
 `-count=1` отключает повторное использование кешированного результата тестов. Проверяйте фактический список выполненных и пропущенных тестов.
+
+Синхронизация OpenAPI с общим контрактом, выдача YAML и Swagger UI (без внешнего стенда):
+
+```bash
+env -u TEST_DATABASE_URL go test -count=1 -v ./internal/api -run '^TestOpenAPI'
+```
 
 ## Integration с PostgreSQL
 

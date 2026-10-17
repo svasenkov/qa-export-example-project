@@ -23,7 +23,7 @@ func TestOpenAPISpecMatchesContractCopy(t *testing.T) {
 		t.Fatalf("read SSOT: %v", err)
 	}
 	if !bytes.Equal(expected, ssot) {
-		t.Fatal("internal/api/openapi.yaml differs from _contract/openapi.yaml")
+		t.Fatal("internal/api/openapi.yaml differs from docs/api/openapi.yaml")
 	}
 
 	recorder := newHarness(t, storetest.New()).do(t, http.MethodGet, "/api/openapi.yaml", "", nil)
@@ -62,5 +62,5 @@ func openAPIPaths(t *testing.T) (copyPath, ssotPath string) {
 	dir := filepath.Dir(file)
 	moduleRoot := filepath.Clean(filepath.Join(dir, "..", ".."))
 	return filepath.Join(dir, "openapi.yaml"),
-		filepath.Join(moduleRoot, "..", "..", "..", "_contract", "openapi.yaml")
+		filepath.Join(moduleRoot, "..", "..", "..", "docs", "api", "openapi.yaml")
 }

@@ -51,17 +51,30 @@ env:
   GRADLE_ENCRYPTION_KEY: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
 jobs:
-  harness-checks:
+  openspec-check:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Harness structure check
-        run: python3 -B tools/check_harness.py
-      - name: tools unit tests
-        run: python3 -B -m unittest discover -s tools -p 'test_*.py'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: tools/openspec/package-lock.json
+      - name: Install pinned OpenSpec CLI
+        run: npm ci --prefix tools/openspec --ignore-scripts
+      - name: Validate specs and changes
+        run: npm run validate --prefix tools/openspec
+
+  compose-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Validate compose config
         run: docker compose config --quiet
 
@@ -160,7 +173,7 @@ jobs:
           retention-days: 1
 
   infra-tests:
-    needs: harness-checks
+    needs: compose-check
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:

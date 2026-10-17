@@ -47,18 +47,28 @@ docker compose --profile mock up -d --build stand-gateway
 
 Mock gateway по умолчанию использует порт `9911`. Источник конфигурации — [docker-compose.yml](docker-compose.yml); при переопределении портов согласуйте с ними конфигурацию тестов.
 
+## Общие инструменты
+
+[tools/allure](tools/allure/README.md) содержит одну конфигурацию отчётности и зависимости CLI
+для всех тестовых стеков. Модули хранят свои адаптеры, результаты и небольшой `allurerc.mjs`.
+[deploy](deploy/README.md) содержит общие Compose-стенды, gateway и mock API.
+
+## Требования и изменения
+
+[OpenSpec](openspec/README.md) хранит требования и сценарии по возможностям, а
+`openspec/changes/` — предложения и дельты изменений. [OpenAPI](docs/api/openapi.yaml)
+сохраняет машиночитаемый HTTP-контракт. Закреплённый локальный CLI и команды проверки —
+в [tools/openspec](tools/openspec/README.md). Сценарии, наличие тестов и результаты
+их выполнения учитываются отдельно.
+
+Каталоги [agents/](agents/README.md) и [eval/](eval/README.md) подготовлены для
+будущих определений агентов и оценки их работы; runtime и runner пока не выбраны.
+
 ## Работа с агентом
 
 В [базе знаний QA](docs/qa/README.md) описаны Page Object, fluent, тестовые данные, API-клиенты и диагностика. Детали выбранного стека находятся в документации соответствующего модуля.
 
-Единственный каталог процедур — `skills/`. [AGENTS.md](AGENTS.md) содержит общие инструкции и ссылки на четыре процедуры: запуск, диагностику, добавление теста и аудит покрытия. [testing.md](docs/qa/testing.md) определяет, какие доказательства нужны для покрытия требований. [harness-checks.md](docs/qa/harness-checks.md) содержит проверку подключения и контрольные задания для самого агента.
-
-```bash
-python3 -B tools/check_harness.py
-python3 -B -m unittest discover -s tools -p 'test_*.py'
-```
-
-Эти команды проверяют метаданные skills, локальные ссылки и сам инструмент проверки. Они не запускают продуктовые тесты и не подтверждают поведение агента.
+Единственный каталог процедур — `skills/`. [AGENTS.md](AGENTS.md) содержит общие инструкции и ссылки на четыре процедуры: запуск, диагностику, добавление теста и аудит покрытия. [testing.md](docs/qa/testing.md) определяет, какие доказательства нужны для покрытия требований.
 
 ## Git hooks
 
@@ -68,7 +78,7 @@ python3 -B -m unittest discover -s tools -p 'test_*.py'
 git config core.hooksPath .githooks
 ```
 
-Хук выполняет `python3 -B tools/check_harness.py`, unit-тесты `tools/` и поиск типовых форматов секретов в staged-файлах. Продуктовые тесты модулей он не запускает и их результат не подтверждает. Осознанный обход в исключительном случае: `git commit --no-verify`.
+Хук ищет типовые форматы секретов в staged-файлах. Продуктовые тесты модулей он не запускает и их результат не подтверждает. Осознанный обход в исключительном случае: `git commit --no-verify`.
 
 ## Следующая функция
 
@@ -78,4 +88,4 @@ git config core.hooksPath .githooks
 
 ## CI
 
-Корневой workflow — [.github/workflows/ci.yml](.github/workflows/ci.yml). Он запускает проверки harness, unit и PostgreSQL-integration тесты backend, typecheck/component/build frontend, infra-тесты тестового модуля, ui на mock-стенде и api+e2e на живом compose-стенде раннера. Команды джобов — те же, что в README модулей. Деплоя, Sonar и внешних стендов в workflow нет; его фактический результат подтверждается только прогоном на GitHub.
+Корневой workflow — [.github/workflows/ci.yml](.github/workflows/ci.yml). Он проверяет структуру OpenSpec (`openspec-check`), конфигурацию Compose (`compose-check`), запускает unit и PostgreSQL-integration тесты backend, typecheck/component/build frontend, infra-тесты тестового модуля, ui на mock-стенде и api+e2e на живом compose-стенде раннера. Команды джобов — те же, что в README модулей. Деплоя, Sonar и внешних стендов в workflow нет; его фактический результат подтверждается только прогоном на GitHub.

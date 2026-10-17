@@ -9,7 +9,6 @@ services:
       POSTGRES_PASSWORD: multistack
     volumes:
     - pgdata:/var/lib/postgresql/data
-    - ./deploy/postgres/init-databases.sh:/docker-entrypoint-initdb.d/01-init-databases.sh:ro
     networks:
     - autotests_ai_multistack_internal
     healthcheck:

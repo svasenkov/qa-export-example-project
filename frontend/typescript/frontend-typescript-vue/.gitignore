@@ -5,3 +5,4 @@ coverage/
 *.tsbuildinfo
 allure-results/
 dev-dist/
+history.jsonl
