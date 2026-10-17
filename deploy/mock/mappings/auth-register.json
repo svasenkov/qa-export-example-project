@@ -1,0 +1,15 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "/api/auth/register"
+  },
+  "response": {
+    "status": 201,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "token": "wiremock-demo-token",
+      "username": "mock-user",
+      "redirectUrl": "/"
+    }
+  }
+}

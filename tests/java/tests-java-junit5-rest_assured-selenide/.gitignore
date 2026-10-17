@@ -1,0 +1,15 @@
+.gradle/
+build/
+.idea/
+.vscode/
+*.iml
+demo/
+
+# Env profiles are committed (Owner classpath:config/${env}.properties).
+
+allure-results/
+allure/sonar-quality-gate.json
+bin/
+node_modules/
+notifications/config.runtime.json
+history.jsonl

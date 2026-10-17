@@ -1,0 +1,127 @@
+name: autotests-ai-multistack-app
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: multistack
+      POSTGRES_PASSWORD: multistack
+    volumes:
+    - pgdata:/var/lib/postgresql/data
+    - ./deploy/postgres/init-databases.sh:/docker-entrypoint-initdb.d/01-init-databases.sh:ro
+    networks:
+    - autotests_ai_multistack_internal
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U multistack -d postgres
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  postgres-ensure-dbs:
+    image: postgres:16-alpine
+    restart: 'no'
+    environment:
+      POSTGRES_USER: multistack
+      POSTGRES_PASSWORD: multistack
+      PGHOST: postgres
+    volumes:
+    - ./deploy/postgres/ensure-databases.sh:/ensure-databases.sh:ro
+    entrypoint:
+    - bash
+    - /ensure-databases.sh
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+    - autotests_ai_multistack_internal
+  backend-go-stdlib:
+    image: ghcr.io/autotests-ai/autotests-ai-multistack-app-backend-go-stdlib:${IMAGE_TAG:-latest}
+    build:
+      labels:
+        org.opencontainers.image.title: autotests-ai-multistack-app-backend-go-stdlib
+        org.opencontainers.image.description: autotests-ai-multistack-app · backend-go-stdlib
+        org.opencontainers.image.source: https://github.com/autotests-ai/autotests-ai-multistack-app
+        org.opencontainers.image.url: https://autotests.ai/stack/backend-go-stdlib/frontend-typescript-vue/
+        org.opencontainers.image.vendor: autotests-ai
+      context: ./backend/go/backend-go-stdlib
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: multistack_app_go_stdlib
+      DB_USER: multistack
+      DB_PASSWORD: multistack
+      SERVER_PORT: 8080
+      MANAGEMENT_PORT: 8081
+      JWT_SECRET: ${JWT_SECRET:-autotests-ai-multistack-dev-secret-change-in-production-min-32-chars}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-ensure-dbs:
+        condition: service_completed_successfully
+    networks:
+    - autotests_ai_multistack_internal
+    ports:
+    - ${BACKEND_GO_STDLIB_PORT:-8831}:8080
+    - ${BACKEND_GO_STDLIB_MANAGEMENT_PORT:-127.0.0.1:8931}:8081
+  frontend-typescript-vue:
+    image: ghcr.io/autotests-ai/autotests-ai-multistack-app-frontend-typescript-vue:${IMAGE_TAG:-latest}
+    build:
+      labels:
+        org.opencontainers.image.title: autotests-ai-multistack-app-frontend-typescript-vue
+        org.opencontainers.image.description: autotests-ai-multistack-app · frontend-typescript-vue
+        org.opencontainers.image.source: https://github.com/autotests-ai/autotests-ai-multistack-app
+        org.opencontainers.image.url: https://autotests.ai/stack/backend-go-stdlib/frontend-typescript-vue/
+        org.opencontainers.image.vendor: autotests-ai
+      context: ./frontend/typescript/frontend-typescript-vue
+    restart: unless-stopped
+    networks:
+    - autotests_ai_multistack_internal
+    ports:
+    - ${FRONTEND_TS_VUE_PORT:-9813}:80
+  api-mock:
+    image: wiremock/wiremock:3.9.1
+    profiles:
+    - mock
+    restart: unless-stopped
+    volumes:
+    - ./deploy/mock/mappings:/home/wiremock/mappings:ro
+    networks:
+    - autotests_ai_multistack_internal
+  stand-gateway:
+    image: nginx:1.27-alpine
+    profiles:
+    - mock
+    restart: unless-stopped
+    volumes:
+    - ./deploy/mock/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      frontend-typescript-vue:
+        condition: service_started
+      api-mock:
+        condition: service_started
+    networks:
+    - autotests_ai_multistack_internal
+    ports:
+    - ${MOCK_GATEWAY_PORT:-9911}:80
+  stand-gateway-ci:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    volumes:
+    - ./deploy/ci/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      frontend-typescript-vue:
+        condition: service_started
+      backend-go-stdlib:
+        condition: service_started
+    networks:
+    - autotests_ai_multistack_internal
+    ports:
+    - ${CI_GATEWAY_PORT:-9821}:80
+networks:
+  autotests_ai_multistack_internal:
+    driver: bridge
+volumes:
+  pgdata: null

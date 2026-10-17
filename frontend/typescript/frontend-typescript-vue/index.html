@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en" class="theme-dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#151414" />
+  <script>
+    // Relative Vite base (./) breaks under nested SPA routes (/stack/): the HTML
+    // preload scanner fetches ./assets/* against the route before a dynamic
+    // <base> exists. document.write pins mount + critical assets during parse.
+    (function () {
+      var m = location.pathname.match(/^\/stack\/(backend-[^/]+\/frontend-[^/]+)/);
+      var fe = location.pathname.match(/^\/stack\/(frontend-[^/]+)/);
+      var mount = m ? '/' + m[1] + '/' : fe ? '/' + fe[1] + '/' : './';
+      document.write('<base href="' + mount + '">');
+      // __PIN_ASSETS__
+    })();
+  </script>
+  <link rel="icon" type="image/svg+xml" href="icons/qa-guru-logo.svg" />
+  <link rel="apple-touch-icon" href="icons/pwa-192.png" />
+  <title>Multistack</title>
+</head>
+<body>
+  <!-- The canonical header mount (#app-header), window.headerConfig and the
+       header.js embed are owned by <AppHeader>, rendered above the router
+       view in App.vue. -->
+  <div id="app"></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

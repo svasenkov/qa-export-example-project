@@ -1,0 +1,10 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Profile — GET /api/auth/me",
+  "type": "object",
+  "required": ["username"],
+  "properties": {
+    "username": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

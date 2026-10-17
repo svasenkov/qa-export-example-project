@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": [
+      "node",
+      "vite/client",
+      "vite-plugin-pwa/client",
+      "vitest/globals",
+      "@testing-library/jest-dom"
+    ],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "allowJs": true,
+    "jsx": "preserve"
+  },
+  "include": ["src", "vite.config.ts", "vitest.config.ts", "./scripts/vite-overlay-runtime.mjs"]
+}

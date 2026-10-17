@@ -1,0 +1,95 @@
+{
+  "base": {
+    "project": "autotests-ai-multistack-app",
+    "environment": "CI",
+    "comment": "",
+    "language": "ru",
+    "allureFolder": "./build/reports/allure-report/allureReport/awesome",
+    "allureResultsFolder": "./build/allure-results",
+    "enableChart": true,
+    "chart": {
+      "profile": "kit",
+      "mode": "collage",
+      "layout": "free",
+      "width": 1080,
+      "height": 1080,
+      "headerHeight": 31,
+      "cardGap": 14,
+      "tilePad": 6,
+      "gridCols": 10,
+      "gridRows": 10,
+      "allureQualityGatePath": "./build/reports/allure-report/allureReport/awesome/widgets/kit-panels/allureQualityGate.json",
+      "items": [
+        {
+          "id": "allureQualityGate",
+          "type": "qualityGate",
+          "x": 0,
+          "y": 0,
+          "w": 10,
+          "h": 1
+        },
+        {
+          "type": "currentStatus",
+          "x": 0,
+          "y": 1,
+          "w": 4,
+          "h": 3
+        },
+        {
+          "type": "statusDynamics",
+          "x": 4,
+          "y": 1,
+          "w": 6,
+          "h": 3
+        },
+        {
+          "type": "testingPyramid",
+          "x": 0,
+          "y": 4,
+          "w": 3,
+          "h": 3
+        },
+        {
+          "type": "durations",
+          "x": 3,
+          "y": 4,
+          "w": 3,
+          "h": 3,
+          "groupBy": "layer"
+        },
+        {
+          "type": "successRateDistribution",
+          "x": 6,
+          "y": 4,
+          "w": 4,
+          "h": 3
+        },
+        {
+          "id": "testsTable",
+          "type": "testsTable",
+          "x": 0,
+          "y": 7,
+          "w": 10,
+          "h": 3
+        }
+      ],
+      "pyramidFallback": "suites",
+      "testsTablePath": "./build/reports/allure-report/allureReport/awesome/widgets/kit-panels/testsTable.json"
+    },
+    "links": {
+      "report": "",
+      "dashboard": "",
+      "testops": "",
+      "build": ""
+    },
+    "darkMode": true,
+    "enableSuitesPublishing": false
+  },
+  "telegram": {
+    "token": "",
+    "chat": "",
+    "topic": "",
+    "replyTo": "",
+    "templatePath": "/templates/telegram.ftl"
+  }
+}

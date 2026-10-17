@@ -1,0 +1,13 @@
+{
+  "scenarioName": "health",
+  "requiredScenarioState": "error",
+  "request": {
+    "method": "GET",
+    "url": "/api/health"
+  },
+  "response": {
+    "status": 500,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": { "message": "WireMock scenario: health unavailable" }
+  }
+}

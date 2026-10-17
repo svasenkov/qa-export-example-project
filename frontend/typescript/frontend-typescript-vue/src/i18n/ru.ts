@@ -1,0 +1,56 @@
+import type { Dictionary } from './types';
+
+/** Copied from frontend-typescript-react/src/i18n/ru.ts — not a shared lib. */
+export const ru: Dictionary = {
+  nav: {
+    home: 'Главная',
+    login: 'Вход',
+    register: 'Регистрация',
+    stack: 'Стек',
+  },
+  home: {
+    title: 'Multistack',
+    blurb: 'SPA TypeScript Vue — элементы из {api}.',
+    session: 'Сессия',
+    welcome: 'Добро пожаловать, {username}!',
+    logout: 'Выйти',
+    deleteAccount: 'Удалить аккаунт',
+    deleteConfirm: 'Удалить этот аккаунт? Это нельзя отменить.',
+    health: 'Статус',
+    healthChecking: '→ Проверка статуса…',
+    healthOk: '→ {status} | сервис: {service} | фронтенд: {frontend}',
+    healthError: '✗ статус: {message}',
+    items: 'Элементы',
+    itemsLoading: '→ Загрузка элементов…',
+    itemsEmpty: 'Элементы не найдены.',
+    itemsError: '✗ элементы: {message}',
+  },
+  login: {
+    title: 'Форма входа',
+    loginLabel: 'Логин',
+    passwordLabel: 'Пароль',
+    submit: 'Войти',
+    noAccount: 'Нет аккаунта?',
+    registerLink: 'Регистрация',
+    errorWrongCredentials: 'Неверный логин или пароль',
+  },
+  register: {
+    title: 'Регистрация',
+    loginLabel: 'Логин',
+    passwordLabel: 'Пароль',
+    confirmLabel: 'Подтверждение',
+    submit: 'Зарегистрироваться',
+    haveAccount: 'Уже есть аккаунт?',
+    loginLink: 'Войти',
+    errorPasswordMismatch: 'Пароли не совпадают',
+    errorRegistrationFailed: 'Регистрация не удалась',
+  },
+  auth: {
+    errorBothRequired: 'Нужны логин и пароль (минимум {minLogin} и {minPassword} символов)',
+    errorLoginRequired: 'Логин обязателен (минимум {minLogin} символов)',
+    errorLoginMinLength: 'Логин должен быть не короче {minLogin} символов',
+    errorPasswordRequired: 'Пароль обязателен (минимум {minPassword} символов)',
+    errorPasswordMinLength: 'Пароль должен быть не короче {minPassword} символов',
+    errorNetwork: 'Ошибка сети. Проверьте соединение и попробуйте снова.',
+  },
+};

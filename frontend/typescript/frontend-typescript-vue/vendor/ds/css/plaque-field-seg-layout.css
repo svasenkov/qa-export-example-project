@@ -1,0 +1,131 @@
+@import url("tokens.css");
+
+/* Plaque field seg — layout integration (grid / stack / mixed)
+   Loaded after plaque-field-seg.css; higher-specificity hooks only. */
+
+.plaque-field-grid .plaque-field--divided:has(> .plaque-field-seg-track) {
+  padding-left: var(--plaque-shell-pad-x);
+  padding-right: var(--plaque-seg-shell-end);
+}
+
+.plaque-field-grid .plaque-field--divided > .plaque-field-seg-track:not(.plaque-field-seg-track--many) {
+  grid-column: 3;
+  justify-self: end;
+  margin-left: 0;
+  width: auto;
+  max-width: none;
+  min-width: min-content;
+  flex-shrink: 0;
+}
+
+/* --many in a grid cell: same 3-col row as PlaqueSelect.
+   Track stays a flex box in column 3 so chips never wrap under the label. */
+.plaque-field-grid .plaque-field--divided > .plaque-field-seg-track--many.plaque-field__control {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  justify-self: stretch;
+  align-self: center;
+  grid-column: 3;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: auto;
+  /* Content min-size — min-height:0 let the 32px shell clip wrapped chips. */
+  min-height: min-content;
+  align-items: stretch;
+}
+
+.plaque-field-grid .plaque-field--divided:has(> .plaque-field-seg-track--many) {
+  display: grid;
+  align-items: start;
+  height: auto;
+  min-height: var(--plaque-control-height);
+  overflow: visible;
+  text-align: unset;
+}
+
+.plaque-field-grid .plaque-field--divided:has(> .plaque-field-seg-track--many)::after {
+  content: none;
+  display: none;
+  margin: 0;
+  height: 0;
+}
+
+.plaque-field-grid .plaque-field--divided:has(> .plaque-field-seg-track--many) > .plaque-field__label,
+.plaque-field-grid .plaque-field--divided:has(> .plaque-field-seg-track--many) > .plaque-field__text {
+  float: none;
+  /* Must keep the wrap-band height. height:auto + align-self:start
+     pinned OS / Agents / Gradle labels to the top of a single 32px row. */
+  height: var(--plaque-seg-band-height);
+  display: inline-flex;
+  align-items: center;
+}
+
+.plaque-field-grid .plaque-field--divided:has(> .plaque-field-seg-track--many) > .plaque-divider {
+  float: none;
+  align-self: stretch;
+  height: auto;
+  min-height: 0;
+  margin-block: var(--plaque-divider-inset);
+  margin-right: 0;
+  background: var(--color-border);
+}
+
+.plaque-field-grid-stack .plaque-field--divided > .plaque-field-seg-track {
+  grid-column: 3;
+  justify-self: end;
+  width: auto;
+}
+
+.plaque-field-grid-stack .plaque-field--divided > .plaque-field-seg-track--many {
+  grid-column: 3;
+  justify-self: stretch;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.plaque-field-grid .plaque-field--divided .plaque-field-seg-track:not(.plaque-field-seg-track--many) .plaque-field-seg {
+  min-width: min-content;
+  flex-shrink: 0;
+}
+
+.plaque-field-grid .plaque-field--divided .plaque-field-seg-track--many .plaque-field-seg {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  flex: 1 1 auto;
+  /* Fill column 3 so flex-wrap has a definite bound. max-content is the
+     unwrapped width — chips then overflow-x and the shell clips "opera:…". */
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  column-gap: var(--plaque-seg-gap);
+  row-gap: calc(var(--plaque-seg-chip-air) * 2 + var(--plaque-seg-row-gap));
+  padding-block: var(--plaque-seg-chip-air);
+}
+
+.plaque-field-grid .plaque-field--divided .plaque-field-seg-track .plaque-field-seg__btn {
+  padding: 0 var(--space-1);
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  min-width: calc(4ch + var(--space-2));
+}
+
+.plaque-field-grid .plaque-field--divided .plaque-field-seg-track--many .plaque-field-seg__btn {
+  margin: 0;
+}
+
+/* Control-first: never clip true|false text inside grid cells */
+.plaque-field-grid .plaque-field--divided .plaque-field-seg-track .plaque-field-seg__btn {
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.plaque-field-grid--mixed .plaque-field--divided > .plaque-field-seg-track--many {
+  justify-self: stretch;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}

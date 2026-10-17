@@ -1,0 +1,12 @@
+{
+  "priority": 10,
+  "request": {
+    "method": "DELETE",
+    "url": "/api/auth/me"
+  },
+  "response": {
+    "status": 401,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": { "message": "Unauthorized" }
+  }
+}

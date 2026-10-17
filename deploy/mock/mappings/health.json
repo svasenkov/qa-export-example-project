@@ -1,0 +1,13 @@
+{
+  "scenarioName": "health",
+  "requiredScenarioState": "Started",
+  "request": {
+    "method": "GET",
+    "url": "/api/health"
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": { "status": "ok", "service": "backend-go-stdlib" }
+  }
+}

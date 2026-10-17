@@ -1,0 +1,20 @@
+{
+  "scenarioName": "items",
+  "requiredScenarioState": "Started",
+  "request": {
+    "method": "GET",
+    "url": "/api/items"
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "items": [
+        { "id": 1, "name": "Alpha", "description": "First seeded item from PostgreSQL" },
+        { "id": 2, "name": "Beta", "description": "Second seeded item for demo API" },
+        { "id": 3, "name": "Gamma", "description": "Third item — multistack bootstrap" }
+      ],
+      "source": "postgresql"
+    }
+  }
+}

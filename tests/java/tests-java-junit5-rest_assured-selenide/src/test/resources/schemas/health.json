@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Health — GET /api/health",
+  "type": "object",
+  "required": ["status", "service"],
+  "properties": {
+    "status": { "type": "string", "minLength": 1 },
+    "service": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

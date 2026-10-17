@@ -1,0 +1,15 @@
+{
+  "priority": 1,
+  "request": {
+    "method": "DELETE",
+    "url": "/api/auth/me",
+    "headers": {
+      "Authorization": {
+        "matches": "Bearer .+"
+      }
+    }
+  },
+  "response": {
+    "status": 204
+  }
+}
