@@ -125,7 +125,7 @@ jobs:
         if: always()
         run: docker rm -f "${{ steps.pg.outputs.container }}" >/dev/null 2>&1 || true
 
-  frontend:
+  frontend-unit:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -209,7 +209,7 @@ jobs:
           retention-days: 1
 
   ui-mock:
-    needs: [frontend, tests-infra]
+    needs: [frontend-unit, tests-infra]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -320,8 +320,9 @@ jobs:
           if-no-files-found: ignore
           retention-days: 1
 
-  stand-tests:
-    needs: [backend-unit, backend-integration, frontend, tests-infra]
+  # API-тесты не открывают браузер — Chrome for Testing здесь не ставится.
+  api-tests:
+    needs: [backend-unit, backend-integration, frontend-unit, tests-infra]
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
@@ -340,9 +341,86 @@ jobs:
       - uses: actions/cache@v6
         with:
           path: ${{ env.TESTS_DIR }}/.gradle/configuration-cache
-          key: gradle-cc-stand-tests-${{ hashFiles(format('{0}/*.gradle*', env.TESTS_DIR), format('{0}/gradle/wrapper/gradle-wrapper.properties', env.TESTS_DIR), format('{0}/gradle.properties', env.TESTS_DIR)) }}-${{ github.sha }}
+          key: gradle-cc-api-tests-${{ hashFiles(format('{0}/*.gradle*', env.TESTS_DIR), format('{0}/gradle/wrapper/gradle-wrapper.properties', env.TESTS_DIR), format('{0}/gradle.properties', env.TESTS_DIR)) }}-${{ github.sha }}
           restore-keys: |
-            gradle-cc-stand-tests-
+            gradle-cc-api-tests-
+      - uses: docker/setup-buildx-action@v4
+      - name: Resolve compose image names
+        id: images
+        run: |
+          set -euo pipefail
+          for svc in backend-go-stdlib frontend-typescript-vue; do
+            name="$(docker compose config --images | grep "${svc}" | head -1)"
+            [ -n "${name}" ] || { echo "${svc} image not found in compose config" >&2; exit 1; }
+            echo "${svc%%-*}=$(echo "${name}" | tr -d '[:space:]')" >> "$GITHUB_OUTPUT"
+          done
+      - name: Build backend image (GHA cache)
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ env.BACKEND_DIR }}
+          tags: ${{ steps.images.outputs.backend }}
+          load: true
+          cache-from: type=gha,scope=${{ github.repository }}-backend
+          cache-to: type=gha,mode=max,scope=${{ github.repository }}-backend
+      - name: Build frontend image (GHA cache)
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ env.FRONTEND_DIR }}
+          tags: ${{ steps.images.outputs.frontend }}
+          load: true
+          cache-from: type=gha,scope=${{ github.repository }}-frontend
+          cache-to: type=gha,mode=max,scope=${{ github.repository }}-frontend
+      - name: Bring up ci stand
+        run: |
+          set -euo pipefail
+          docker compose up -d
+          curl -fsS --retry 30 --retry-delay 2 --retry-all-errors \
+            "http://127.0.0.1:${BACKEND_GO_STDLIB_PORT}/api/health"
+          curl -fsS --retry 30 --retry-delay 2 --retry-all-errors \
+            "http://127.0.0.1:${CI_GATEWAY_PORT}/"
+      - name: API tests (ci stand)
+        id: run-api-tests
+        working-directory: ${{ env.TESTS_DIR }}
+        run: ./gradlew test -Denv=ci -DincludeTags=api
+      - name: Tear down ci stand
+        if: always()
+        continue-on-error: true
+        run: docker compose down -v --remove-orphans
+      - name: Publish reports
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports-api-tests
+          path: |
+            ${{ env.TESTS_DIR }}/build/allure-results/**
+            ${{ env.TESTS_DIR }}/build/reports/tests/test/**
+          if-no-files-found: ignore
+          retention-days: 1
+
+  e2e-tests:
+    needs: [backend-unit, backend-integration, frontend-unit, tests-infra]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+          cache-encryption-key: ${{ env.GRADLE_ENCRYPTION_KEY }}
+          cache-read-only: true
+      - uses: actions/cache@v6
+        with:
+          path: ${{ env.TESTS_DIR }}/.gradle/configuration-cache
+          key: gradle-cc-e2e-tests-${{ hashFiles(format('{0}/*.gradle*', env.TESTS_DIR), format('{0}/gradle/wrapper/gradle-wrapper.properties', env.TESTS_DIR), format('{0}/gradle.properties', env.TESTS_DIR)) }}-${{ github.sha }}
+          restore-keys: |
+            gradle-cc-e2e-tests-
       - name: Read Chrome for Testing pin
         id: chrome-pin
         working-directory: ${{ env.TESTS_DIR }}
@@ -393,10 +471,6 @@ jobs:
             "http://127.0.0.1:${BACKEND_GO_STDLIB_PORT}/api/health"
           curl -fsS --retry 30 --retry-delay 2 --retry-all-errors \
             "http://127.0.0.1:${CI_GATEWAY_PORT}/"
-      - name: API tests (ci stand)
-        id: run-api-tests
-        working-directory: ${{ env.TESTS_DIR }}
-        run: ./gradlew test -Denv=ci -DincludeTags=api
       - name: E2E tests (ci stand)
         id: run-e2e-tests
         working-directory: ${{ env.TESTS_DIR }}
@@ -413,7 +487,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
-          name: reports-stand-tests
+          name: reports-e2e-tests
           path: |
             ${{ env.TESTS_DIR }}/build/allure-results/**
             ${{ env.TESTS_DIR }}/build/reports/tests/test/**
