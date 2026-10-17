@@ -1,18 +1,28 @@
 #!/bin/sh
-# Pre-commit: быстрые проверки перед коммитом.
-# Активируется локально: git config core.hooksPath .githooks
-# Обход в исключительных случаях: git commit --no-verify
+# Pre-commit: проверки репозитория перед коммитом.
+# Активируется на клоне: git config core.hooksPath .githooks
+# Осознанный обход в исключительных случаях: git commit --no-verify
+#
+# Область проверки: структура harness, unit-тесты tools/ и типовые
+# форматы секретов в staged-файлах. Продуктовые тесты модулей этот
+# хук не выполняет и их прохождение не подтверждает.
 
 set -e
 cd "$(git rev-parse --show-toplevel)"
 
-echo "pre-commit: проверка harness"
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "ОШИБКА: python3 не найден, проверки harness не выполнены." >&2
+  echo "Установите python3 или осознанно обойдите: git commit --no-verify" >&2
+  exit 1
+fi
+
+echo "pre-commit: структура harness (tools/check_harness.py)"
 python3 -B tools/check_harness.py
 
 echo "pre-commit: unit-тесты tools"
 python3 -B -m unittest discover -s tools -p 'test_*.py'
 
-echo "pre-commit: поиск секретов в staged-файлах"
+echo "pre-commit: staged-файлы без типовых форматов секретов"
 if git grep --cached -qE 'BEGIN [A-Z ]*PRIVATE KEY|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[0-9A-Za-z-]{10,}|AKIA[0-9A-Z]{16}'; then
   echo "ОШИБКА: в staged-файлах найдено похожее на секрет значение." >&2
   echo "Уберите его из индекса. Осознанный обход: git commit --no-verify" >&2
