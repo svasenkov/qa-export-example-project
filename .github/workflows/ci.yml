@@ -1,0 +1,416 @@
+name: CI
+
+# CI этой сборки: только её стеки (backend Go, frontend Vue/TS, tests Java).
+# Команды — из README модулей, ручки — в env ниже. Стенды — локальный compose
+# на раннере: mock (WireMock) для ui, живой backend+frontend для api/e2e.
+# Пин Chrome for Testing читается из tests/.../chrome-for-testing.properties.
+# В этой сборке нет деплоя, Sonar, TestOps и нагрузочного тестирования.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      update_mock_screenshots:
+        description: "ui-mock: перезаписать эталоны скриншотов mock вместо сравнения"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.ref_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_TAG: ${{ github.sha }}
+  # Модули сборки
+  BACKEND_DIR: backend/go/backend-go-stdlib
+  FRONTEND_DIR: frontend/typescript/frontend-typescript-vue
+  TESTS_DIR: tests/java/tests-java-junit5-rest_assured-selenide
+  # Тулчейны; версии Go/Node читаются из go.mod / .nvmrc соответствующих модулей
+  JAVA_DISTRIBUTION: temurin
+  JAVA_VERSION: "21"
+  # Одноразовая БД для backend integration (см. README backend-модуля)
+  POSTGRES_IMAGE: postgres:16-alpine
+  POSTGRES_PORT: "55432"
+  POSTGRES_USER: multistack
+  POSTGRES_PASSWORD: multistack
+  POSTGRES_DB: scratch
+  # Порты compose-стендов на раннере (совпадают с config/*.properties тестов)
+  BACKEND_GO_STDLIB_PORT: "8831"
+  CI_GATEWAY_PORT: "9821"
+  MOCK_GATEWAY_PORT: "9911"
+  # Каталог эталонных скриншотов (ScreenshotHelper читает эти переменные)
+  SCREENSHOT_OS: linux
+  SCREENSHOT_BROWSER: chrome
+  GRADLE_OPTS: -Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000 -Dorg.gradle.internal.repository.max.retries=8 -Dorg.gradle.internal.repository.max.interval=3000
+  GRADLE_ENCRYPTION_KEY: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+jobs:
+  harness:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Harness structure check
+        run: python3 -B tools/check_harness.py
+      - name: tools unit tests
+        run: python3 -B -m unittest discover -s tools -p 'test_*.py'
+      - name: Validate compose config
+        run: docker compose config --quiet
+
+  backend-unit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: ${{ env.BACKEND_DIR }}/go.mod
+          cache-dependency-path: ${{ env.BACKEND_DIR }}/go.sum
+      - name: Unit tests
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: env -u TEST_DATABASE_URL go test -count=1 ./...
+
+  backend-integration:
+    needs: backend-unit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: ${{ env.BACKEND_DIR }}/go.mod
+          cache-dependency-path: ${{ env.BACKEND_DIR }}/go.sum
+      - name: Start scratch PostgreSQL
+        id: pg
+        run: |
+          set -euo pipefail
+          NAME="ci-pg-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "container=${NAME}" >> "$GITHUB_OUTPUT"
+          docker run -d --name "${NAME}" \
+            -e POSTGRES_USER="${POSTGRES_USER}" \
+            -e POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
+            -e POSTGRES_DB="${POSTGRES_DB}" \
+            -p "127.0.0.1:${POSTGRES_PORT}:5432" \
+            --health-cmd="pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" \
+            --health-interval=1s --health-timeout=3s --health-retries=30 \
+            "${POSTGRES_IMAGE}"
+          for _ in $(seq 1 40); do
+            if [ "$(docker inspect -f '{{.State.Health.Status}}' "${NAME}")" = healthy ]; then
+              echo "PostgreSQL is healthy"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "ERROR: PostgreSQL did not become healthy" >&2
+          docker logs "${NAME}" >&2 || true
+          exit 1
+      - name: Integration tests (real PostgreSQL)
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: >-
+          TEST_DATABASE_URL="postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable"
+          go test -count=1 -v ./internal/store -run '^TestPostgres'
+      - name: Stop scratch PostgreSQL
+        if: always()
+        run: docker rm -f "${{ steps.pg.outputs.container }}" >/dev/null 2>&1 || true
+
+  frontend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ${{ env.FRONTEND_DIR }}/.nvmrc
+          cache: npm
+          cache-dependency-path: ${{ env.FRONTEND_DIR }}/package-lock.json
+      - name: Install dependencies
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm ci
+      - name: Typecheck
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm run typecheck
+      - name: Component tests (Vitest)
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm test
+      - name: Production build
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm run build
+      - name: Publish raw Allure results
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: allure-results-frontend
+          path: ${{ env.FRONTEND_DIR }}/allure-results/**
+          if-no-files-found: ignore
+          retention-days: 1
+
+  tests-infra:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+          cache-encryption-key: ${{ env.GRADLE_ENCRYPTION_KEY }}
+      - uses: actions/cache@v6
+        with:
+          path: ${{ env.TESTS_DIR }}/.gradle/configuration-cache
+          key: gradle-cc-tests-infra-${{ hashFiles(format('{0}/*.gradle*', env.TESTS_DIR), format('{0}/gradle/wrapper/gradle-wrapper.properties', env.TESTS_DIR), format('{0}/gradle.properties', env.TESTS_DIR)) }}-${{ github.sha }}
+          restore-keys: |
+            gradle-cc-tests-infra-
+      - name: Infra tests + JaCoCo gate
+        id: run-tests
+        working-directory: ${{ env.TESTS_DIR }}
+        run: ./gradlew test jacocoTestReport jacocoTestCoverageVerification -Denv=ci -DincludeTags=infra
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ${{ env.FRONTEND_DIR }}/.nvmrc
+          cache: npm
+          cache-dependency-path: ${{ env.TESTS_DIR }}/package-lock.json
+      - name: Reporting utils tests
+        working-directory: ${{ env.TESTS_DIR }}
+        run: |
+          npm ci
+          npm run test:meta
+          node scripts/validate-allurerc.mjs
+      - name: Publish reports
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports-tests-infra
+          path: |
+            ${{ env.TESTS_DIR }}/build/allure-results/**
+            ${{ env.TESTS_DIR }}/build/reports/tests/test/**
+            ${{ env.TESTS_DIR }}/build/reports/jacoco/**
+          if-no-files-found: ignore
+          retention-days: 1
+
+  ui-mock:
+    needs: [frontend, tests-infra]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+          cache-encryption-key: ${{ env.GRADLE_ENCRYPTION_KEY }}
+          cache-read-only: true
+      - uses: actions/cache@v6
+        with:
+          path: ${{ env.TESTS_DIR }}/.gradle/configuration-cache
+          key: gradle-cc-ui-mock-${{ hashFiles(format('{0}/*.gradle*', env.TESTS_DIR), format('{0}/gradle/wrapper/gradle-wrapper.properties', env.TESTS_DIR), format('{0}/gradle.properties', env.TESTS_DIR)) }}-${{ github.sha }}
+          restore-keys: |
+            gradle-cc-ui-mock-
+      - name: Read Chrome for Testing pin
+        id: chrome-pin
+        working-directory: ${{ env.TESTS_DIR }}
+        run: echo "version=$(bash scripts/install-chrome-for-testing.sh --print-version)" >> "$GITHUB_OUTPUT"
+      - name: Cache Chrome for Testing
+        continue-on-error: true
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.tool_cache }}/setup-chrome
+          key: chrome-for-testing-${{ runner.os }}-${{ runner.arch }}-${{ steps.chrome-pin.outputs.version }}
+      - name: Install pinned Chrome for Testing
+        id: setup-chrome
+        uses: browser-actions/setup-chrome@v2.1.2
+        with:
+          chrome-version: ${{ steps.chrome-pin.outputs.version }}
+          install-chromedriver: true
+      - uses: docker/setup-buildx-action@v4
+      - name: Resolve compose image name
+        id: image
+        run: |
+          set -euo pipefail
+          name="$(docker compose config --images | grep frontend-typescript-vue | head -1)"
+          [ -n "${name}" ] || { echo "frontend image not found in compose config" >&2; exit 1; }
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+      - name: Build frontend image (GHA cache)
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ env.FRONTEND_DIR }}
+          tags: ${{ steps.image.outputs.name }}
+          load: true
+          cache-from: type=gha,scope=${{ github.repository }}-frontend
+          cache-to: type=gha,mode=max,scope=${{ github.repository }}-frontend
+      - name: Bring up mock stand
+        run: |
+          set -euo pipefail
+          docker compose --profile mock up -d stand-gateway
+          curl -fsS --retry 30 --retry-delay 2 --retry-all-errors \
+            "http://127.0.0.1:${MOCK_GATEWAY_PORT}/api/health"
+      - name: UI tests (mock, without screenshot compare)
+        id: run-tests
+        working-directory: ${{ env.TESTS_DIR }}
+        env:
+          CHROME_BINARY_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+          CHROMEDRIVER_PATH: ${{ steps.setup-chrome.outputs.chromedriver-path }}
+        run: ./gradlew test -Denv=mock -DincludeTags=ui -DexcludeTags=screenshot
+      - name: Screenshot compare (mock baselines)
+        id: run-screenshot-tests
+        if: inputs.update_mock_screenshots != 'true'
+        working-directory: ${{ env.TESTS_DIR }}
+        env:
+          CHROME_BINARY_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+          CHROMEDRIVER_PATH: ${{ steps.setup-chrome.outputs.chromedriver-path }}
+        run: ./gradlew test -Denv=mock -DincludeTags=screenshot
+      - name: Update mock screenshot baselines
+        if: inputs.update_mock_screenshots == 'true'
+        working-directory: ${{ env.TESTS_DIR }}
+        env:
+          CHROME_BINARY_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+          CHROMEDRIVER_PATH: ${{ steps.setup-chrome.outputs.chromedriver-path }}
+        run: ./gradlew test -Denv=mock -DincludeTags=screenshot -DupdateScreenshots=true
+      - name: Publish updated screenshot PNGs
+        if: always() && inputs.update_mock_screenshots == 'true'
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: mock-screenshot-pngs
+          path: ${{ env.TESTS_DIR }}/src/test/resources/screenshots/
+          if-no-files-found: ignore
+      - name: Tear down mock stand
+        if: always()
+        continue-on-error: true
+        run: docker compose --profile mock down -v --remove-orphans
+      - name: Publish reports
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports-ui-mock
+          path: |
+            ${{ env.TESTS_DIR }}/build/allure-results/**
+            ${{ env.TESTS_DIR }}/build/reports/tests/test/**
+          if-no-files-found: ignore
+          retention-days: 1
+
+  stand-tests:
+    needs: [backend-unit, backend-integration, frontend, tests-infra]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+          cache-encryption-key: ${{ env.GRADLE_ENCRYPTION_KEY }}
+          cache-read-only: true
+      - uses: actions/cache@v6
+        with:
+          path: ${{ env.TESTS_DIR }}/.gradle/configuration-cache
+          key: gradle-cc-stand-tests-${{ hashFiles(format('{0}/*.gradle*', env.TESTS_DIR), format('{0}/gradle/wrapper/gradle-wrapper.properties', env.TESTS_DIR), format('{0}/gradle.properties', env.TESTS_DIR)) }}-${{ github.sha }}
+          restore-keys: |
+            gradle-cc-stand-tests-
+      - name: Read Chrome for Testing pin
+        id: chrome-pin
+        working-directory: ${{ env.TESTS_DIR }}
+        run: echo "version=$(bash scripts/install-chrome-for-testing.sh --print-version)" >> "$GITHUB_OUTPUT"
+      - name: Cache Chrome for Testing
+        continue-on-error: true
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.tool_cache }}/setup-chrome
+          key: chrome-for-testing-${{ runner.os }}-${{ runner.arch }}-${{ steps.chrome-pin.outputs.version }}
+      - name: Install pinned Chrome for Testing
+        id: setup-chrome
+        uses: browser-actions/setup-chrome@v2.1.2
+        with:
+          chrome-version: ${{ steps.chrome-pin.outputs.version }}
+          install-chromedriver: true
+      - uses: docker/setup-buildx-action@v4
+      - name: Resolve compose image names
+        id: images
+        run: |
+          set -euo pipefail
+          for svc in backend-go-stdlib frontend-typescript-vue; do
+            name="$(docker compose config --images | grep "${svc}" | head -1)"
+            [ -n "${name}" ] || { echo "${svc} image not found in compose config" >&2; exit 1; }
+            echo "${svc%%-*}=$(echo "${name}" | tr -d '[:space:]')" >> "$GITHUB_OUTPUT"
+          done
+      - name: Build backend image (GHA cache)
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ env.BACKEND_DIR }}
+          tags: ${{ steps.images.outputs.backend }}
+          load: true
+          cache-from: type=gha,scope=${{ github.repository }}-backend
+          cache-to: type=gha,mode=max,scope=${{ github.repository }}-backend
+      - name: Build frontend image (GHA cache)
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ env.FRONTEND_DIR }}
+          tags: ${{ steps.images.outputs.frontend }}
+          load: true
+          cache-from: type=gha,scope=${{ github.repository }}-frontend
+          cache-to: type=gha,mode=max,scope=${{ github.repository }}-frontend
+      - name: Bring up ci stand
+        run: |
+          set -euo pipefail
+          docker compose up -d
+          curl -fsS --retry 30 --retry-delay 2 --retry-all-errors \
+            "http://127.0.0.1:${BACKEND_GO_STDLIB_PORT}/api/health"
+          curl -fsS --retry 30 --retry-delay 2 --retry-all-errors \
+            "http://127.0.0.1:${CI_GATEWAY_PORT}/"
+      - name: API tests (ci stand)
+        id: run-api-tests
+        working-directory: ${{ env.TESTS_DIR }}
+        run: ./gradlew test -Denv=ci -DincludeTags=api
+      - name: E2E tests (ci stand)
+        id: run-e2e-tests
+        working-directory: ${{ env.TESTS_DIR }}
+        env:
+          CHROME_BINARY_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+          CHROMEDRIVER_PATH: ${{ steps.setup-chrome.outputs.chromedriver-path }}
+        run: ./gradlew test -Denv=ci -DincludeTags=e2e -DexcludeTags=screenshot
+      - name: Tear down ci stand
+        if: always()
+        continue-on-error: true
+        run: docker compose down -v --remove-orphans
+      - name: Publish reports
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports-stand-tests
+          path: |
+            ${{ env.TESTS_DIR }}/build/allure-results/**
+            ${{ env.TESTS_DIR }}/build/reports/tests/test/**
+          if-no-files-found: ignore
+          retention-days: 1
