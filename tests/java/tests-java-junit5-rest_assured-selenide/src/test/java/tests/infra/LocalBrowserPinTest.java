@@ -37,9 +37,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * applies it only when {@code remoteUrl} is empty and {@code browser=chrome}.
  * Selenoid uses the hub image tag; {@code -Dbrowser=firefox} skips the pin.
  * Do not grow this helper into a multi-browser installer until there is a
- * matching pin + screenshot folder (a sibling {@code firefox-*/} beside
- * {@code chrome-148/} — {@code ScreenshotHelper} still takes the major segment
- * from the Chrome pin).
+ * matching pin + screenshot folder (a sibling {@code firefox-<major>}
+ * directory beside {@code chrome-148/} — {@code ScreenshotHelper} still
+ * takes the major segment from the Chrome pin).
  */
 @Layer("infra")
 @Epic("Test infra")
