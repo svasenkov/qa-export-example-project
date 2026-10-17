@@ -51,7 +51,7 @@ env:
   GRADLE_ENCRYPTION_KEY: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
 jobs:
-  harness-tests:
+  harness-checks:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -160,6 +160,7 @@ jobs:
           retention-days: 1
 
   infra-tests:
+    needs: harness-checks
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -188,13 +189,13 @@ jobs:
         with:
           node-version-file: ${{ env.FRONTEND_DIR }}/.nvmrc
           cache: npm
-          cache-dependency-path: ${{ env.TESTS_DIR }}/package-lock.json
+          cache-dependency-path: tools/allure/package-lock.json
       - name: Reporting utils tests
-        working-directory: ${{ env.TESTS_DIR }}
         run: |
-          npm ci
-          npm run test:meta
-          node scripts/validate-allurerc.mjs
+          npm ci --prefix tools/allure
+          npm test --prefix tools/allure
+          node tools/allure/validate.mjs "$TESTS_DIR/allurerc.mjs"
+          node tools/allure/validate.mjs "$FRONTEND_DIR/allurerc.mjs"
       - name: Publish reports
         if: always()
         continue-on-error: true
@@ -276,14 +277,9 @@ jobs:
           CHROME_BINARY_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
           CHROMEDRIVER_PATH: ${{ steps.setup-chrome.outputs.chromedriver-path }}
         run: ./gradlew test -Denv=mock -DincludeTags=ui -DexcludeTags=screenshot
-      # Эталон mock/home-layout/1280 устарел: он сгенерирован для другой сборки
-      # (React+Spring, 2 item), а эта сборка — Vue+Go, 3 item. До перегенерации
-      # и коммита новых PNG compare не гоняется на push — только вручную через
-      # workflow_dispatch без update_mock_screenshots. После фикса baseline
-      # вернуть запуск на push в этом шаге.
       - name: Screenshot compare (mock baselines)
         id: run-screenshot-tests
-        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.update_mock_screenshots }}
+        if: ${{ !inputs.update_mock_screenshots }}
         working-directory: ${{ env.TESTS_DIR }}
         env:
           CHROME_BINARY_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
@@ -399,7 +395,7 @@ jobs:
           retention-days: 1
 
   e2e-tests:
-    needs: [backend-unit-tests, backend-integration-tests, frontend-unit-tests, infra-tests]
+    needs: api-tests
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
