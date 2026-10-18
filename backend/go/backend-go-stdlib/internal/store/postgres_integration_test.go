@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"testing"
 	"time"
@@ -20,16 +21,40 @@ func openPostgres(t *testing.T) (*store.Postgres, context.Context) {
 		t.Skip("set TEST_DATABASE_URL to a scratch database to run the PostgreSQL tests")
 	}
 
-	pg, err := store.Open(dsn)
+	// Every test owns its schema, including on assertion failure. Never truncate
+	// application tables or rely on leftovers from a previous attempt.
+	admin, err := store.Open(dsn)
 	if err != nil {
-		t.Fatalf("Open: %v", err)
+		t.Fatalf("Open admin: %v", err)
 	}
-	t.Cleanup(func() { _ = pg.Close() })
-
+	t.Cleanup(func() { _ = admin.Close() })
 	ctx := t.Context()
-	if err := pg.WaitReady(ctx, 30*time.Second); err != nil {
+	if err := admin.WaitReady(ctx, 30*time.Second); err != nil {
 		t.Fatalf("WaitReady: %v", err)
 	}
+	schemaName := fmt.Sprintf("qa_%d", time.Now().UnixNano())
+	if err := admin.ApplySchema(ctx, "CREATE SCHEMA "+schemaName); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		cleanup, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := admin.ApplySchema(cleanup, "DROP SCHEMA "+schemaName+" CASCADE"); err != nil {
+			t.Errorf("cleanup schema: %v", err)
+		}
+	})
+	parsed, err := url.Parse(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	query := parsed.Query()
+	query.Set("search_path", schemaName)
+	parsed.RawQuery = query.Encode()
+	pg, err := store.Open(parsed.String())
+	if err != nil {
+		t.Fatalf("Open isolated schema: %v", err)
+	}
+	t.Cleanup(func() { _ = pg.Close() })
 	schema, err := os.ReadFile("../../schema.sql")
 	if err != nil {
 		t.Fatalf("read schema.sql: %v", err)
@@ -142,5 +167,45 @@ func TestPostgresSeedIsIdempotent(t *testing.T) {
 	}
 	if _, err := pg.FindUserByUsername(ctx, store.SeedUsername); err != nil {
 		t.Fatalf("seed user missing: %v", err)
+	}
+}
+
+// REG-003: exercise the real unique constraint under competing inserts; the
+// handler's mapping of ErrDuplicateUsername to 409 is covered in handler_test.go.
+func TestPostgresConcurrentUsername(t *testing.T) {
+	pg, ctx := openPostgres(t)
+	username := fmt.Sprintf("race-%d", time.Now().UnixNano())
+	t.Cleanup(func() {
+		if err := pg.DeleteUser(context.Background(), username); err != nil {
+			t.Errorf("cleanup concurrent user: %v", err)
+		}
+	})
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	for range 2 {
+		go func() {
+			<-start
+			_, err := pg.CreateUser(ctx, username, "hash")
+			results <- err
+		}()
+	}
+	close(start)
+	successes, conflicts := 0, 0
+	for range 2 {
+		err := <-results
+		switch {
+		case err == nil:
+			successes++
+		case errors.Is(err, store.ErrDuplicateUsername):
+			conflicts++
+		default:
+			t.Errorf("unexpected insert error: %v", err)
+		}
+	}
+	if successes != 1 || conflicts != 1 {
+		t.Fatalf("inserts: %d succeeded, %d conflicted; want one of each", successes, conflicts)
+	}
+	if _, err := pg.FindUserByUsername(ctx, username); err != nil {
+		t.Fatalf("winner not persisted: %v", err)
 	}
 }

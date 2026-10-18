@@ -32,10 +32,23 @@ type contextKey struct{}
 
 var usernameKey contextKey
 
+// tokenService is the part of security.TokenService the handler needs; the narrow
+// interface lets tests substitute a failing issuer/verifier.
+type tokenService interface {
+	Create(username string) (string, error)
+	Username(raw string) (string, error)
+}
+
+// Test seams for dependency failures the real implementations never produce.
+var (
+	hashPassword = security.HashPassword
+	marshalJSON  = json.Marshal
+)
+
 // Handler serves /api/**. It only knows the Store interface, never the driver.
 type Handler struct {
 	store       store.Store
-	tokens      *security.TokenService
+	tokens      tokenService
 	serviceName string
 }
 
@@ -79,7 +92,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	passwordHash, err := security.HashPassword(password)
+	passwordHash, err := hashPassword(password)
 	if err != nil {
 		h.serverError(w, err)
 		return
@@ -222,7 +235,7 @@ func (h *Handler) credentials(w http.ResponseWriter, r *http.Request) (username,
 // writeJSON marshals up front so the body carries no trailing newline, matching the
 // other backends byte-for-byte.
 func (h *Handler) writeJSON(w http.ResponseWriter, status int, payload any) {
-	body, err := json.Marshal(payload)
+	body, err := marshalJSON(payload)
 	if err != nil {
 		log.Printf("%s: marshal response: %v", h.serviceName, err)
 		body = []byte(`{"message":"` + messageServerError + `"}`)

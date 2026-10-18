@@ -1,35 +1,44 @@
 package security
 
-import "golang.org/x/crypto/bcrypt"
+import (
+	"crypto/sha256"
+	"encoding/base64"
+	"strings"
 
-// bcryptMaxInputBytes is a property of the algorithm: bcrypt ignores everything past the
-// 72nd byte of its input. Truncating explicitly keeps the contract's 128-character
-// passwords usable instead of failing them, which is what Python's bcrypt and bcryptjs —
-// used by the other reference backends — do implicitly.
-const bcryptMaxInputBytes = 72
+	"golang.org/x/crypto/bcrypt"
+)
 
-// HashPassword produces a bcrypt hash at the default cost, which is what
-// Spring's BCryptPasswordEncoder and Python's bcrypt also use.
+// The version is stored with the hash; the existing VARCHAR(255) needs no migration.
+const passwordVersion = "$qa-sha256-bcrypt-v1$"
+
+// HashPassword binds every byte of the password. Base64 keeps the bcrypt input
+// below 72 bytes and avoids binary/NUL handling differences between implementations.
 func HashPassword(password string) (string, error) {
-	hash, err := bcrypt.GenerateFromPassword(bcryptInput(password), bcrypt.DefaultCost)
+	return hashPassword(password, bcrypt.DefaultCost)
+}
+
+// hashPassword takes the cost separately so tests can exercise the bcrypt failure path.
+func hashPassword(password string, cost int) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword(passwordDigest(password), cost)
 	if err != nil {
 		return "", err
 	}
-	return string(hash), nil
+	return passwordVersion + string(hash), nil
 }
 
-// CheckPassword reports whether password matches the stored bcrypt hash. It truncates
-// exactly like HashPassword, so a password longer than 72 bytes still round-trips.
 func CheckPassword(password, hash string) bool {
-	return bcrypt.CompareHashAndPassword([]byte(hash), bcryptInput(password)) == nil
+	if strings.HasPrefix(hash, passwordVersion) {
+		return bcrypt.CompareHashAndPassword([]byte(strings.TrimPrefix(hash, passwordVersion)), passwordDigest(password)) == nil
+	}
+	// Legacy hashes cannot distinguish exactly 72 bytes from a truncated longer
+	// password. Fail closed for both; never silently migrate an ambiguous login.
+	if len([]byte(password)) >= 72 {
+		return false
+	}
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
 }
 
-// bcryptInput cuts by bytes, not runes, because bytes are what bcrypt counts. A cut that
-// splits a multi-byte character is harmless: hashing and verification cut at the same offset.
-func bcryptInput(password string) []byte {
-	input := []byte(password)
-	if len(input) > bcryptMaxInputBytes {
-		return input[:bcryptMaxInputBytes]
-	}
-	return input
+func passwordDigest(password string) []byte {
+	sum := sha256.Sum256([]byte(password))
+	return []byte(base64.StdEncoding.EncodeToString(sum[:]))
 }

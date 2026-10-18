@@ -448,6 +448,9 @@ func TestDeleteAccount(t *testing.T) {
 	// Stateless JWT: the token still verifies, but the user row it names is gone.
 	profile := h.do(t, http.MethodGet, "/api/auth/me", "", map[string]string{"Authorization": "Bearer " + token})
 	requireStatus(t, profile, http.StatusUnauthorized)
+	repeated := h.do(t, http.MethodDelete, "/api/auth/me", "", map[string]string{"Authorization": "Bearer " + token})
+	requireStatus(t, repeated, http.StatusUnauthorized)
+	requireMessage(t, repeated, "Unauthorized")
 }
 
 func TestDeleteAccountWithoutToken(t *testing.T) {
@@ -530,5 +533,24 @@ func TestRegisterThenLoginThenMe(t *testing.T) {
 	requireStatus(t, profile, http.StatusOK)
 	if body := profile.Body.String(); body != `{"username":"fresh"}` {
 		t.Fatalf("body = %s", body)
+	}
+}
+
+// AUTH-003a must also reject a wrong password near the allowed maximum.
+func TestLoginRejectsWrongPasswordSuffix(t *testing.T) {
+	h := newHarness(t, storetest.New())
+	prefix := strings.Repeat("p", 72)
+	registered := h.do(t, http.MethodPost, "/api/auth/register",
+		`{"username":"suffix-user","password":"`+prefix+`original"}`, nil)
+	requireStatus(t, registered, http.StatusCreated)
+	for _, password := range []string{prefix + "different", prefix} {
+		reply := h.do(t, http.MethodPost, "/api/auth/login",
+			`{"username":"suffix-user","password":"`+password+`"}`, nil)
+		// Do not print an unexpected success body: it contains a usable JWT.
+		if reply.Code != http.StatusUnauthorized {
+			t.Errorf("wrong password returned HTTP %d, want 401", reply.Code)
+			continue
+		}
+		requireMessage(t, reply, "Wrong login or password")
 	}
 }

@@ -25,18 +25,23 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
-const (
+const readHeaderTimeout = 10 * time.Second
+
+// Test seams: replacing these in-process lets the startup suite exercise fatal
+// exits and deadline errors deterministically without extra processes.
+var (
+	logFatalf            = log.Fatalf
+	openStore            = store.Open
 	databaseReadyTimeout = 60 * time.Second
-	readHeaderTimeout    = 10 * time.Second
 	shutdownTimeout      = 10 * time.Second
 )
 
 func main() {
 	cfg := config.Load()
 
-	pg, err := store.Open(cfg.DatabaseURL)
+	pg, err := openStore(cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("%s: %v", cfg.ServiceName, err)
+		logFatalf("%s: %v", cfg.ServiceName, err)
 	}
 	defer func() { _ = pg.Close() }()
 
@@ -44,13 +49,13 @@ func main() {
 	defer stop()
 
 	if err := pg.WaitReady(ctx, databaseReadyTimeout); err != nil {
-		log.Fatalf("%s: %v", cfg.ServiceName, err)
+		logFatalf("%s: %v", cfg.ServiceName, err)
 	}
 	if err := pg.ApplySchema(ctx, schemaSQL); err != nil {
-		log.Fatalf("%s: %v", cfg.ServiceName, err)
+		logFatalf("%s: %v", cfg.ServiceName, err)
 	}
 	if err := store.Seed(ctx, pg, security.HashPassword); err != nil {
-		log.Fatalf("%s: seed: %v", cfg.ServiceName, err)
+		logFatalf("%s: seed: %v", cfg.ServiceName, err)
 	}
 
 	handler := api.NewHandler(
@@ -72,7 +77,7 @@ func main() {
 	go func() {
 		log.Printf("%s management listening on %s", cfg.ServiceName, management.Addr)
 		if err := management.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("%s: management: %v", cfg.ServiceName, err)
+			logFatalf("%s: management: %v", cfg.ServiceName, err)
 		}
 	}()
 
@@ -90,6 +95,6 @@ func main() {
 
 	log.Printf("%s listening on %s", cfg.ServiceName, server.Addr)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Fatalf("%s: %v", cfg.ServiceName, err)
+		logFatalf("%s: %v", cfg.ServiceName, err)
 	}
 }

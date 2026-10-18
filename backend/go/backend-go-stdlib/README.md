@@ -57,3 +57,19 @@ docker stop qa-integration-postgres
 ## Приложение
 
 Локальный запуск полного приложения описан в [корневом README](../../../README.md). Конфигурация backend — в [internal/config](internal/config), схема — в [schema.sql](schema.sql). Модуль при старте применяет схему и создаёт учебные данные.
+
+## Полная область coverage
+
+На отдельной PostgreSQL из раздела integration:
+
+```bash
+go test -count=1 -coverpkg=./... -coverprofile=coverage.out -json ./... > tests.jsonl
+go tool cover -func=coverage.out
+go vet ./...
+```
+
+`TEST_DATABASE_URL` обязателен для полного запуска; unit без него оставляет skip.
+Сохраняйте `coverage.out` и JSONL в новом каталоге каждой попытки. Область продукта —
+все исполняемые `.go`, включая main. `internal/store/storetest` — тестовая
+инфраструктура, её метрика учитывается отдельно. Go измеряет statements, не branches.
+Цель — 100%, текущий gate не проходит. Проверка свежести — [tools/quality](../../../tools/quality/README.md).

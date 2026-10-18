@@ -1,6 +1,7 @@
 package security_test
 
 import (
+	"golang.org/x/crypto/bcrypt"
 	"strings"
 	"testing"
 
@@ -12,7 +13,7 @@ func TestHashPasswordRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HashPassword: %v", err)
 	}
-	if hash == "password1" || !strings.HasPrefix(hash, "$2") {
+	if hash == "password1" || !strings.HasPrefix(hash, "$qa-sha256-bcrypt-v1$$2") {
 		t.Fatalf("hash = %q, want a bcrypt hash", hash)
 	}
 	if !security.CheckPassword("password1", hash) {
@@ -60,20 +61,19 @@ func TestHashPasswordBeyondBcryptInputLimit(t *testing.T) {
 	}
 }
 
-func TestCheckPasswordIgnoresBytesPastTheLimit(t *testing.T) {
-	// Inherent to bcrypt and shared with bcryptjs and Python's bcrypt: only the first
-	// 72 bytes take part in the hash. Asserted here so the behaviour is documented.
+func TestCheckPasswordRejectsDifferentSuffix(t *testing.T) {
+	// AUTH-003 + FORM-003: every character of an accepted password matters.
 	prefix := strings.Repeat("p", 72)
 	hash, err := security.HashPassword(prefix + "-original-tail")
 	if err != nil {
 		t.Fatalf("HashPassword: %v", err)
 	}
 
-	if !security.CheckPassword(prefix+"-a-completely-different-tail", hash) {
-		t.Fatal("bytes past the 72nd must be ignored, as in the other backends")
+	if security.CheckPassword(prefix+"-a-completely-different-tail", hash) {
+		t.Fatal("different password suffix must be rejected")
 	}
-	if !security.CheckPassword(prefix, hash) {
-		t.Fatal("the first 72 bytes alone must verify")
+	if security.CheckPassword(prefix, hash) {
+		t.Fatal("a truncated password must be rejected")
 	}
 	if security.CheckPassword(strings.Repeat("q", 72)+"-original-tail", hash) {
 		t.Fatal("a difference inside the first 72 bytes must be rejected")
@@ -101,5 +101,28 @@ func TestHashPasswordWithMultibyteRunes(t *testing.T) {
 				t.Fatal("CheckPassword accepted an unrelated password")
 			}
 		})
+	}
+}
+
+func TestLegacyPasswordCompatibility(t *testing.T) {
+	for _, password := range []string{strings.Repeat("a", 71), strings.Repeat("a", 72), strings.Repeat("é", 36)} {
+		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := security.CheckPassword(password, string(hash)); got != (len([]byte(password)) < 72) {
+			t.Fatalf("legacy compatibility at %d bytes: %v", len([]byte(password)), got)
+		}
+		if security.CheckPassword(password+"suffix", string(hash)) {
+			t.Fatal("legacy suffix accepted")
+		}
+	}
+}
+
+func TestVersionedPasswordRejectsCorruption(t *testing.T) {
+	for _, hash := range []string{"$qa-sha256-bcrypt-v1$", "$qa-sha256-bcrypt-v2$garbage", "$qa-sha256-bcrypt-v1$garbage"} {
+		if security.CheckPassword("password1", hash) {
+			t.Fatal("corrupt or unknown format accepted")
+		}
 	}
 }

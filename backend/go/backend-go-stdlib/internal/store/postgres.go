@@ -18,9 +18,12 @@ type Postgres struct {
 	db *sql.DB
 }
 
+// sqlOpen is the seam letting tests exercise a driver-level open failure.
+var sqlOpen = sql.Open
+
 // Open prepares a connection pool; it does not connect yet.
 func Open(dsn string) (*Postgres, error) {
-	db, err := sql.Open("pgx", dsn)
+	db, err := sqlOpen("pgx", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
