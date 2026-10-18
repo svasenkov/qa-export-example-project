@@ -109,3 +109,14 @@ SW registered in `src/pwa/registerServiceWorker.ts` under the Vite base path.
 Vitest пишет результаты в `allure-results/`. HTML-отчёт использует общий
 [tools/allure](../../../tools/allure/README.md) через локальный
 [allurerc.mjs](allurerc.mjs). Отдельная копия конфигурации и CLI не нужна.
+
+## Полная область coverage
+
+`@vitest/coverage-v8` закреплён точно на версии установленного Vitest 4.1.10.
+`npm ci` использует lockfile. `npm test -- --coverage` измеряет все `src/**/*.{ts,js,vue}`,
+включая неимпортированные файлы, и собственный `vendor/ds/js/app-base.js`.
+Исключены только тесты и декларации `.d.ts` в src.
+Пороги lines/statements/functions/branches = 100; текущий неполный результат падает.
+`COVERAGE_DIR` позволяет сохранять каждую попытку отдельно. Нельзя удалять прошлые
+отчёты; используйте новый каталог. Vendor DS и inline boot в index.html требуют
+отдельной проверки состава: coverage src не объявляется покрытием всей поставки.

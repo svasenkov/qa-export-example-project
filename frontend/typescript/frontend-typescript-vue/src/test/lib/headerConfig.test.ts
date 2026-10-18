@@ -5,6 +5,7 @@ import {
   headerConfig,
   STACK_INDEX_HREF,
   syncHeaderNav,
+  type HeaderConfig,
 } from '../../lib/headerConfig';
 
 describe('buildHeaderConfig', () => {
@@ -65,5 +66,12 @@ describe('syncHeaderNav', () => {
 
     syncHeaderNav(buildHeaderConfig('en'), key);
     expect(remount).toHaveBeenCalledTimes(2);
+  });
+
+  it('treats a config without nav as an empty label set', () => {
+    const key = syncHeaderNav({ nav: undefined } as unknown as HeaderConfig, null);
+
+    expect(key).toBe('');
+    expect(window.headerConfig?.nav).toBeUndefined();
   });
 });

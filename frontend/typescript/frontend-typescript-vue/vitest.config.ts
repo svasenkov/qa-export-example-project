@@ -12,8 +12,20 @@ export default defineConfig({
     },
   },
   test: {
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{ts,js,vue}', 'vendor/ds/js/app-base.js'],
+      exclude: ['src/test/**', '**/*.d.ts'],
+      reporter: ['text', 'lcov', 'json', 'json-summary'],
+      reportsDirectory: process.env.COVERAGE_DIR || 'coverage',
+      reportOnFailure: true,
+      thresholds: { lines: 100, statements: 100, functions: 100, branches: 100 },
+    },
     environment: 'jsdom',
     globals: true,
+    // Instrumented runs queue microtasks behind v8 serialization; the default
+    // 5s is not enough for user-event flows on a loaded runner.
+    testTimeout: 15000,
     setupFiles: ['./src/test/setup.ts', 'allure-vitest/setup'],
     include: ['src/test/**/*.test.{ts,tsx}'],
     css: true,

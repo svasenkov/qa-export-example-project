@@ -5,6 +5,7 @@ import {
   fetchProfile,
   formatMessage,
   getToken,
+  login,
   logout,
   resolveAuthErrorMessage,
   saveSession,
@@ -89,6 +90,50 @@ describe('fetchProfile', () => {
   });
 });
 
+describe('apiRequest', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('surfaces the server message when the body parses', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({ message: 'Wrong login or password' }),
+      }),
+    );
+
+    await expect(login('user1', 'password1')).rejects.toThrow('Wrong login or password');
+  });
+
+  it('falls back to a generic message when the error body is not JSON', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: async () => {
+          throw new SyntaxError('Unexpected token');
+        },
+      }),
+    );
+
+    await expect(login('user1', 'password1')).rejects.toThrow('Request failed');
+  });
+
+  it('maps a transport failure to a network error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')));
+
+    await expect(login('user1', 'password1')).rejects.toMatchObject({ network: true });
+  });
+});
+
 describe('session teardown', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -106,6 +151,16 @@ describe('session teardown', () => {
 
     expect(getToken()).toBeNull();
     expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull();
+  });
+
+  it('logout skips the API call entirely without a session', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await logout();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(getToken()).toBeNull();
   });
 
   it('logout sends POST /auth/logout with the bearer token', async () => {

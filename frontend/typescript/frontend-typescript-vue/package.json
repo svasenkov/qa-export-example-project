@@ -21,6 +21,7 @@
     "@testing-library/vue": "^8.1.0",
     "@types/node": "26.2.0",
     "@vitejs/plugin-vue": "^6.0.8",
+    "@vitest/coverage-v8": "4.1.10",
     "@vue/test-utils": "^2.4.11",
     "allure-js-commons": "^3.10.2",
     "allure-vitest": "^3.10.2",

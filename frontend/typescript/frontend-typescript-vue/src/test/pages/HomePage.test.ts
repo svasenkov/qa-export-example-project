@@ -249,6 +249,79 @@ describe('HomePage', () => {
     );
   });
 
+  it('shows empty items state when the payload carries no items field', async () => {
+    stubDefaultApis((url) => {
+      if (url.includes('/api/items')) {
+        return jsonResponse({});
+      }
+      return null;
+    });
+
+    await renderHome();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('items-list')).toHaveTextContent('No items found.'),
+    );
+  });
+
+  // Callbacks landing after teardown must not resurrect state on a dead view.
+  it('ignores late resolutions that land after unmount', async () => {
+    localStorage.setItem('authToken', 'valid-token');
+    const pending: Promise<Response>[] = [];
+    stubDefaultApis((url) => {
+      if (
+        url.includes('/api/health') ||
+        url.includes('/api/items') ||
+        url.includes('/api/auth/me')
+      ) {
+        const delayed = new Promise<Response>((resolve) =>
+          setTimeout(() => resolve(jsonResponse({ status: 'UP', service: 'svc', items: [], username: 'late' })), 30),
+        );
+        pending.push(delayed);
+        return delayed;
+      }
+      return null;
+    });
+
+    const { unmount } = await renderHome();
+    const healthEl = screen.getByTestId('health-status');
+    unmount();
+    await Promise.all(pending.map((p) => p.then(() => new Promise((r) => setTimeout(r, 50)))));
+
+    // The unmounted view keeps its pre-resolution copy — nothing re-renders.
+    expect(healthEl).toHaveTextContent('Checking health');
+    expect(localStorage.getItem('authToken')).toBe('valid-token');
+  });
+
+  it('ignores late rejections that land after unmount', async () => {
+    localStorage.setItem('authToken', 'valid-token');
+    const pending: Promise<Response>[] = [];
+    stubDefaultApis((url) => {
+      if (
+        url.includes('/api/health') ||
+        url.includes('/api/items') ||
+        url.includes('/api/auth/me')
+      ) {
+        const delayed = new Promise<Response>((_, reject) =>
+          setTimeout(() => reject(new Error('late failure')), 30),
+        );
+        pending.push(delayed);
+        return delayed;
+      }
+      return null;
+    });
+
+    const { unmount } = await renderHome();
+    const healthEl = screen.getByTestId('health-status');
+    unmount();
+    await Promise.allSettled(pending);
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(healthEl).toHaveTextContent('Checking health');
+    // A rejected profile lookup after unmount must not clear the session.
+    expect(localStorage.getItem('authToken')).toBe('valid-token');
+  });
+
   it('retranslates chrome on header:lang-change and keeps API payloads', async () => {
     localStorage.setItem('authToken', 'valid-token');
     await renderHome();
@@ -330,4 +403,58 @@ describe('HomePage', () => {
     expect(screen.getByTestId('items-list')).toHaveTextContent(ru.home.itemsLoading);
     unmount();
   });
+});
+
+// Observe both sides of pending requests: an immediate final-state assertion misses early cleanup.
+describe('HomePage session contract', () => {
+  beforeEach(() => { localStorage.clear(); localStorage.setItem('authToken', 'valid-token'); });
+  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+
+  it.each([401, 500, 'offline'] as const)('ACC-002 clears session on profile failure %s', async (failure) => {
+    stubDefaultApis((url) => url.includes('/api/auth/me')
+      ? (failure === 'offline' ? Promise.reject(new TypeError('offline')) : jsonResponse({}, false, failure))
+      : null);
+    await renderHome();
+    await waitFor(() => expect(localStorage.getItem('authToken')).toBeNull());
+    expect(screen.getByTestId('welcome-panel')).not.toBeVisible();
+    expect(screen.getByTestId('welcome-message')).toHaveTextContent('');
+  });
+
+  it.each(['en', 'ru'])('ACC-003 waits for profile and uses its name (%s)', async (lang) => {
+    localStorage.setItem('zds-lang', lang);
+    let respond!: (response: Response) => void;
+    const pending = new Promise<Response>(resolve => { respond = resolve; });
+    stubDefaultApis((url) => url.includes('/api/auth/me') ? pending : null);
+    await renderHome();
+    expect(screen.getByTestId('welcome-panel')).not.toBeVisible();
+    expect(fetch).toHaveBeenCalledWith('/api/auth/me', {
+      method: 'GET', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer valid-token' },
+    });
+    respond(jsonResponse({ username: 'profile-name' }));
+    await waitFor(() => expect(screen.getByTestId('welcome-panel')).toBeVisible());
+    expect(screen.getByTestId('welcome-message').textContent?.trim()).toBe(
+      lang === 'ru' ? 'Добро пожаловать, profile-name!' : 'Welcome, profile-name!',
+    );
+  });
+
+  for (const action of ['logout', 'delete-account'] as const) {
+    it.each(['success', 'http-error', 'offline'])(`ACC-004/005 ${action} waits, then clears and redirects: %s`, async (outcome) => {
+      let respond!: (response: Response) => void;
+      let reject!: (reason: Error) => void;
+      const pending = new Promise<Response>((resolve, fail) => { respond = resolve; reject = fail; });
+      stubDefaultApis((url, init) =>
+        (action === 'logout' ? url.includes('/api/auth/logout') : init?.method === 'DELETE') ? pending : null);
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      await renderHome();
+      await waitFor(() => expect(screen.getByTestId('welcome-panel')).toBeVisible());
+      await userEvent.setup().click(screen.getByTestId(`${action}-button`));
+      expect(localStorage.getItem('authToken')).toBe('valid-token');
+      expect(router.currentRoute.value.path).toBe('/');
+      expect(screen.getByTestId('welcome-panel')).toBeVisible();
+      if (outcome === 'offline') reject(new TypeError('offline'));
+      else respond(jsonResponse({}, outcome === 'success', outcome === 'success' ? 204 : 500));
+      await waitFor(() => expect(router.currentRoute.value.path).toBe('/login'));
+      expect(localStorage.getItem('authToken')).toBeNull();
+    });
+  }
 });
