@@ -37,62 +37,78 @@ class AuthRoundTripApiTests extends ApiTestBase {
         String username = DataFaker.username();
         String password = "password123";
 
-        given()
+        String registrationToken = given()
                 .contentType(JSON)
                 .body(new RegisterRequest(username, password))
                 .when()
                 .post("/api/auth/register")
                 .then()
                 .statusCode(201)
-                .body("username", equalTo(username));
+                .body("username", equalTo(username))
+                .extract().path("token");
 
-        String token = given()
-                .contentType(JSON)
-                .body(new LoginRequest(username, password))
-                .when()
-                .post("/api/auth/login")
-                .then()
-                .statusCode(200)
-                .extract()
-                .path("token");
+        try {
 
-        given()
-                .header("Authorization", "Bearer " + token)
-                .when()
-                .get("/api/auth/me")
-                .then()
-                .statusCode(200)
-                .body("username", equalTo(username));
+            String token = given()
+                    .contentType(JSON)
+                    .body(new LoginRequest(username, password))
+                    .when()
+                    .post("/api/auth/login")
+                    .then()
+                    .statusCode(200)
+                    .extract()
+                    .path("token");
 
-        given()
-                .header("Authorization", "Bearer " + token)
-                .when()
-                .post("/api/auth/logout")
-                .then()
-                .statusCode(204);
+            given()
+                    .header("Authorization", "Bearer " + token)
+                    .when()
+                    .get("/api/auth/me")
+                    .then()
+                    .statusCode(200)
+                    .body("username", equalTo(username));
 
-        // Stateless JWT: logout does not invalidate the token server-side — by design.
-        given()
-                .header("Authorization", "Bearer " + token)
-                .when()
-                .get("/api/auth/me")
-                .then()
-                .statusCode(200)
-                .body("username", equalTo(username));
+            given()
+                    .header("Authorization", "Bearer " + token)
+                    .when()
+                    .post("/api/auth/logout")
+                    .then()
+                    .statusCode(204)
+                    .body(equalTo(""));
 
-        given()
-                .header("Authorization", "Bearer " + token)
-                .when()
-                .delete("/api/auth/me")
-                .then()
-                .statusCode(204);
+            // Stateless JWT: logout does not invalidate the token server-side — by design.
+            given()
+                    .header("Authorization", "Bearer " + token)
+                    .when()
+                    .get("/api/auth/me")
+                    .then()
+                    .statusCode(200)
+                    .body("username", equalTo(username));
 
-        // The token still verifies cryptographically, but the account is gone → 401.
-        given()
-                .header("Authorization", "Bearer " + token)
-                .when()
-                .get("/api/auth/me")
-                .then()
-                .statusCode(401);
+            given()
+                    .header("Authorization", "Bearer " + token)
+                    .when()
+                    .delete("/api/auth/me")
+                    .then()
+                    .statusCode(204)
+                    .body(equalTo(""));
+
+            // The token still verifies cryptographically, but the account is gone → 401.
+            given()
+                    .header("Authorization", "Bearer " + token)
+                    .when()
+                    .get("/api/auth/me")
+                    .then()
+                    .statusCode(401);
+
+            given()
+                    .header("Authorization", "Bearer " + token)
+                    .when().delete("/api/auth/me")
+                    .then().statusCode(401);
+        } finally {
+            // The registration token also permits cleanup if login or a later assertion fails.
+            given().header("Authorization", "Bearer " + registrationToken)
+                    .when().delete("/api/auth/me")
+                    .then().statusCode(org.hamcrest.Matchers.oneOf(204, 401));
+        }
     }
 }

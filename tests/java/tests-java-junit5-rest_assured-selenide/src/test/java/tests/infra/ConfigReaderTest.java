@@ -74,21 +74,23 @@ class ConfigReaderTest extends AllureMeta {
     }
 
     @Test
-    @DisplayName("loaded baseUrl has no trailing slash (Selenide Configuration.baseUrl)")
-    void loadedBaseUrlHasNoTrailingSlash() {
-        assertEquals("http://localhost:9821", ConfigReader.testConfig.baseUrl());
+    @DisplayName("loaded baseUrl respects the explicit override or CI default")
+    void loadedBaseUrlRespectsOverride() {
+        assertEquals(System.getProperty("baseUrl", "http://localhost:9821"), ConfigReader.testConfig.baseUrl());
     }
 
     @Test
     @DisplayName("resolveBaseUrl uses loaded config")
     void resolveBaseUrlUsesLoadedConfig() {
-        assertEquals("http://localhost:9821/", ConfigReader.resolveBaseUrl());
+        assertEquals(System.getProperty("baseUrl", "http://localhost:9821").replaceAll("/+$", "") + "/",
+                ConfigReader.resolveBaseUrl());
     }
 
     @Test
     @DisplayName("resolveApiBaseUrl uses loaded config")
     void resolveApiBaseUrlUsesLoadedConfig() {
-        assertEquals("http://localhost:8831/", ConfigReader.resolveApiBaseUrl());
+        assertEquals(System.getProperty("apiBaseUrl", "http://localhost:8831").replaceAll("/+$", "") + "/",
+                ConfigReader.resolveApiBaseUrl());
     }
 
     @Test

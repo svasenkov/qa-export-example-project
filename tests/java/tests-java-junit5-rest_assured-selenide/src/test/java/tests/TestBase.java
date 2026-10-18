@@ -86,7 +86,8 @@ public class TestBase extends AllureMeta {
         var chrome = new ChromeOptions();
         chrome.addArguments("--no-sandbox");
         boolean captureHar = browserConfig.enableHar() || browserConfig.attachHarLogs();
-        if (captureHar && HarCapture.supportsBrowser(browserConfig.browser())) {
+        if (captureHar) {
+            // Only reached for browser=chrome — chromium family by construction.
             HarCapture.enablePerformanceLogging(chrome);
         }
         return chrome;

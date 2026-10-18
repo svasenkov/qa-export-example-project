@@ -29,7 +29,9 @@ public final class MockScenarios {
                     .get("/__admin/scenarios")
                     .statusCode();
             return status == 200;
-        } catch (RuntimeException gatewayUnreachable) {
+        } catch (Exception gatewayUnreachable) {
+            // RestAssured sneaky-throws checked IOExceptions (e.g. ConnectException) —
+            // a RuntimeException-only catch would leak them instead of reporting false.
             return false;
         }
     }

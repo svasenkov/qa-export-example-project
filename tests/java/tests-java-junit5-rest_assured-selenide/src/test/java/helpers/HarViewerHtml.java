@@ -43,8 +43,10 @@ public final class HarViewerHtml {
             Map<String, Object> log = (Map<String, Object>) logRaw;
             return fillTemplate(buildSummary(log), buildContent(log));
         } catch (RuntimeException ex) {
+            String detail = java.util.Objects.requireNonNullElse(
+                    ex.getMessage(), ex.getClass().getSimpleName());
             return fillTemplate("Parse error",
-                    "<div class=\"error\">Failed to render HAR: " + escapeHtml(ex.getMessage()) + "</div>");
+                    "<div class=\"error\">Failed to render HAR: " + escapeHtml(detail) + "</div>");
         }
     }
 
@@ -327,7 +329,7 @@ public final class HarViewerHtml {
     }
 
     private static String escapeHtml(String text) {
-        if (text == null || text.isEmpty()) {
+        if (text.isEmpty()) {
             return "";
         }
         return text

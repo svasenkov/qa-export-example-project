@@ -5,6 +5,8 @@ import config.ConfigReader;
 import io.qameta.allure.Allure;
 import io.qameta.allure.AttachmentOptions;
 
+import config.TestConfig;
+
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
@@ -30,6 +32,13 @@ public final class ScreenshotHelper {
 
     public static void captureAndCompare(
             SelenideElement element, String area, int viewport, String attachmentName) {
+        captureAndCompare(element, area, viewport, attachmentName, ConfigReader.testConfig);
+    }
+
+    /** Test seam: harness coverage drives explicit stub configs. */
+    public static void captureAndCompare(
+            SelenideElement element, String area, int viewport, String attachmentName,
+            TestConfig config) {
         element.shouldBe(visible);
 
         var screenshotFile = element.screenshot();
@@ -44,7 +53,7 @@ public final class ScreenshotHelper {
         var screenshotPath = screenshotFilePath(area, viewport);
         var screenshotPresent = screenshotExists(area, viewport);
 
-        if (shouldUpdateScreenshots()) {
+        if (shouldUpdateScreenshots(config)) {
             step("Update screenshot: " + attachmentName, () ->
                     attachUpdateMode(attachmentName, actual, screenshotPresent, area, viewport));
             writeScreenshot(screenshotPath, actual);
@@ -62,7 +71,7 @@ public final class ScreenshotHelper {
 
         try {
             var expected = readExpectedScreenshot(area, viewport);
-            var comparison = compareImages(expected, actual, label);
+            var comparison = compareImages(expected, actual, label, config);
             step("Compare screenshot: " + attachmentName, () -> {
                 if (comparison.passed()) {
                     attachPng(attachmentName, actual);
@@ -98,12 +107,16 @@ public final class ScreenshotHelper {
         Allure.attachment(name, "image/png", new ByteArrayInputStream(png), AttachmentOptions.withFileExtension(".png"));
     }
 
-    private static boolean shouldUpdateScreenshots() {
-        return ConfigReader.testConfig.updateScreenshots();
+    public static boolean shouldUpdateScreenshots(TestConfig config) {
+        return config.updateScreenshots();
     }
 
     private static String screenshotsDir() {
-        var dir = ConfigReader.testConfig.screenshotsDir().trim();
+        return screenshotsDir(ConfigReader.testConfig);
+    }
+
+    public static String screenshotsDir(TestConfig config) {
+        var dir = config.screenshotsDir().trim();
         if (dir.isEmpty()) {
             throw new IllegalStateException("screenshotsDir must not be empty");
         }
@@ -128,7 +141,11 @@ public final class ScreenshotHelper {
     }
 
     static String screenshotOs() {
-        var override = System.getenv("SCREENSHOT_OS");
+        return screenshotOs(System::getenv);
+    }
+
+    public static String screenshotOs(java.util.function.Function<String, String> getenv) {
+        var override = getenv.apply("SCREENSHOT_OS");
         var raw = (override != null && !override.isBlank())
                 ? override.trim()
                 : osFamily();
@@ -140,7 +157,11 @@ public final class ScreenshotHelper {
     }
 
     static String screenshotBrowser() {
-        var override = System.getenv("SCREENSHOT_BROWSER");
+        return screenshotBrowser(System::getenv);
+    }
+
+    public static String screenshotBrowser(java.util.function.Function<String, String> getenv) {
+        var override = getenv.apply("SCREENSHOT_BROWSER");
         if (override != null && !override.isBlank()) {
             return override.trim().toLowerCase(Locale.ROOT);
         }
@@ -157,7 +178,11 @@ public final class ScreenshotHelper {
     }
 
     private static String osFamily() {
-        var name = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        return osFamily(System.getProperty("os.name", ""));
+    }
+
+    public static String osFamily(String osName) {
+        var name = osName.toLowerCase(Locale.ROOT);
         if (name.contains("mac") || name.contains("darwin")) {
             return "darwin";
         }
@@ -178,7 +203,7 @@ public final class ScreenshotHelper {
         if (key.equals("linux") || key.contains("linux")) {
             return "linux";
         }
-        return key.isEmpty() ? "linux" : key;
+        return key;
     }
 
     private static Path screenshotFilePath(String area, int viewport) {
@@ -201,7 +226,7 @@ public final class ScreenshotHelper {
         return Files.exists(screenshotFilePath(area, viewport));
     }
 
-    private static byte[] readExpectedScreenshot(String area, int viewport) throws IOException {
+    public static byte[] readExpectedScreenshot(String area, int viewport) throws IOException {
         var resource = screenshotResourcePath(area, viewport);
         var url = Thread.currentThread().getContextClassLoader().getResource(resource);
         if (url != null) {
@@ -216,7 +241,8 @@ public final class ScreenshotHelper {
         throw new IOException("Screenshot not found: " + resource);
     }
 
-    private static void writeScreenshot(Path screenshotPath, byte[] png) {
+    /** Test seam: harness coverage drives impossible paths directly. */
+    public static void writeScreenshot(Path screenshotPath, byte[] png) {
         try {
             Files.createDirectories(screenshotPath.getParent());
             Files.write(screenshotPath, png);
@@ -229,7 +255,8 @@ public final class ScreenshotHelper {
     private record ImageComparison(boolean passed, byte[] diffPng, String message) {
     }
 
-    private static ImageComparison compareImages(byte[] expectedBytes, byte[] actualBytes, String label)
+    private static ImageComparison compareImages(
+            byte[] expectedBytes, byte[] actualBytes, String label, TestConfig config)
             throws IOException {
         var expected = readImage(expectedBytes);
         var actual = readImage(actualBytes);
@@ -261,7 +288,7 @@ public final class ScreenshotHelper {
             }
         }
 
-        var maxDiffRatio = ConfigReader.testConfig.screenshotDiffThreshold();
+        var maxDiffRatio = config.screenshotDiffThreshold();
         var diffRatio = (double) diffPixels / totalPixels;
         if (diffRatio > maxDiffRatio) {
             return new ImageComparison(

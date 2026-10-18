@@ -17,8 +17,6 @@ import org.junit.jupiter.api.Test;
 import static io.restassured.RestAssured.given;
 import static io.restassured.http.ContentType.JSON;
 import static io.restassured.module.jsv.JsonSchemaValidator.matchesJsonSchemaInClasspath;
-import static org.hamcrest.Matchers.allOf;
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 
 /**
@@ -68,6 +66,26 @@ class AuthApiTests extends ApiTestBase {
 
     @Test
     @Tag("api")
+    @Tag("negative")
+    @DisplayName("AUTH-003a: login rejects a changed suffix of a maximum-length password")
+    void loginRejectsDifferentPasswordSuffix() {
+        String username = DataFaker.username();
+        String password = "p".repeat(128);
+        String token = AuthApiClient.register(username, password);
+        try {
+            int status = given().contentType(JSON)
+                    .body(new LoginRequest(username, "p".repeat(127) + "q"))
+                    .when().post("/api/auth/login").statusCode();
+            // Do not attach an unexpected success body containing a usable JWT.
+            org.junit.jupiter.api.Assertions.assertEquals(401, status,
+                    "A changed password suffix must not authenticate");
+        } finally {
+            AuthApiClient.deleteAccount(token);
+        }
+    }
+
+    @Test
+    @Tag("api")
     @DisplayName("POST /api/auth/login answers an unknown user with the same 401 (no enumeration)")
     void loginWithUnknownUsername() {
         given()
@@ -77,6 +95,7 @@ class AuthApiTests extends ApiTestBase {
                 .post("/api/auth/login")
                 .then()
                 .statusCode(401)
+                .body(matchesJsonSchemaInClasspath("schemas/error.json"))
                 .body("message", equalTo(WRONG_CREDENTIALS_MESSAGE));
     }
 
@@ -92,10 +111,7 @@ class AuthApiTests extends ApiTestBase {
                 .then()
                 .statusCode(400)
                 .body(matchesJsonSchemaInClasspath("schemas/error.json"))
-                .body("message", allOf(
-                        containsString("username"),
-                        containsString("password"),
-                        containsString("; ")));
+                .body("message", equalTo("username is required; password is required"));
     }
 
     @Test
@@ -111,7 +127,7 @@ class AuthApiTests extends ApiTestBase {
                 .then()
                 .statusCode(400)
                 .body(matchesJsonSchemaInClasspath("schemas/error.json"))
-                .body("message", containsString("username"));
+                .body("message", equalTo("username must be 3-64 characters"));
     }
 
     @Test
@@ -127,7 +143,7 @@ class AuthApiTests extends ApiTestBase {
                 .then()
                 .statusCode(400)
                 .body(matchesJsonSchemaInClasspath("schemas/error.json"))
-                .body("message", containsString("password"));
+                .body("message", equalTo("password must be 6-128 characters"));
     }
 
     @Test
@@ -143,7 +159,7 @@ class AuthApiTests extends ApiTestBase {
                 .then()
                 .statusCode(400)
                 .body(matchesJsonSchemaInClasspath("schemas/error.json"))
-                .body("message", containsString("username"));
+                .body("message", equalTo("username is required"));
     }
 
     @Test
@@ -159,7 +175,7 @@ class AuthApiTests extends ApiTestBase {
                 .then()
                 .statusCode(400)
                 .body(matchesJsonSchemaInClasspath("schemas/error.json"))
-                .body("message", containsString("password"));
+                .body("message", equalTo("password is required"));
     }
 
     @Test
@@ -174,6 +190,7 @@ class AuthApiTests extends ApiTestBase {
                 .post("/api/auth/login")
                 .then()
                 .statusCode(400)
+                .body(matchesJsonSchemaInClasspath("schemas/error.json"))
                 .body("message", equalTo("Request body is not valid JSON"));
     }
 
@@ -261,7 +278,7 @@ class AuthApiTests extends ApiTestBase {
                 .then()
                 .statusCode(400)
                 .body(matchesJsonSchemaInClasspath("schemas/error.json"))
-                .body("message", containsString("password"));
+                .body("message", equalTo("password must be 6-128 characters"));
     }
 
     @Test
@@ -276,7 +293,7 @@ class AuthApiTests extends ApiTestBase {
                 .then()
                 .statusCode(400)
                 .body(matchesJsonSchemaInClasspath("schemas/error.json"))
-                .body("message", containsString("username"));
+                .body("message", equalTo("username must be 3-64 characters"));
     }
 
     @Test
@@ -291,7 +308,7 @@ class AuthApiTests extends ApiTestBase {
                 .then()
                 .statusCode(400)
                 .body(matchesJsonSchemaInClasspath("schemas/error.json"))
-                .body("message", containsString("username"));
+                .body("message", equalTo("username is required"));
     }
 
     @Test
@@ -306,7 +323,7 @@ class AuthApiTests extends ApiTestBase {
                 .then()
                 .statusCode(400)
                 .body(matchesJsonSchemaInClasspath("schemas/error.json"))
-                .body("message", containsString("password"));
+                .body("message", equalTo("password is required"));
     }
 
     @Test
@@ -321,9 +338,7 @@ class AuthApiTests extends ApiTestBase {
                 .then()
                 .statusCode(400)
                 .body(matchesJsonSchemaInClasspath("schemas/error.json"))
-                .body("message", allOf(
-                        containsString("username"),
-                        containsString("password")));
+                .body("message", equalTo("username is required; password is required"));
     }
 
     @Test
@@ -337,6 +352,7 @@ class AuthApiTests extends ApiTestBase {
                 .post("/api/auth/register")
                 .then()
                 .statusCode(400)
+                .body(matchesJsonSchemaInClasspath("schemas/error.json"))
                 .body("message", equalTo("Request body is not valid JSON"));
     }
 
@@ -387,7 +403,8 @@ class AuthApiTests extends ApiTestBase {
                 .when()
                 .post("/api/auth/logout")
                 .then()
-                .statusCode(204);
+                .statusCode(204)
+                .body(equalTo(""));
     }
 
     @Test
@@ -431,6 +448,7 @@ class AuthApiTests extends ApiTestBase {
                 .post("/api/auth/login")
                 .then()
                 .statusCode(401)
+                .body(matchesJsonSchemaInClasspath("schemas/error.json"))
                 .body("message", equalTo(WRONG_CREDENTIALS_MESSAGE));
     }
 

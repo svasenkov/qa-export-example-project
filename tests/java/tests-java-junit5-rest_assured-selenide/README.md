@@ -64,7 +64,7 @@ Manual-сценарии в [ExploratoryManualTests](src/test/java/tests/manual/E
 
 Отчёт Gradle: `build/reports/tests/test/`; XML: `build/test-results/test/`; Allure: `build/allure-results/`. Сохраняйте результаты каждой попытки отдельно перед повторным запуском. Не считайте весь накопленный каталог Allure результатом последней команды.
 
-Проверки с тегом `infra` относятся к тестовым утилитам. JaCoCo gate из `build.gradle` ограничен выбранными утилитами и не измеряет покрытие продукта.
+Проверки с тегом `infra` относятся к тестовым утилитам. JaCoCo gate из `build.gradle` измеряет весь вспомогательный Java-код автоматизации, не Go/Vue-продукт.
 
 CI находится в [корневом workflow](../../../.github/workflows/ci.yml).
 Он сохраняет результаты тестов как artifacts; генерация и публикация общего HTML-отчёта в нём не настроены.
@@ -77,3 +77,17 @@ CI также использует его для чтения версии Chrom
 
 Sonar-панель появляется только при явном `SONAR_QUALITY_GATE_JSON` с измеренным результатом.
 Без него панель отсутствует; некорректный файл вызывает ошибку.
+
+## Полная область JaCoCo
+
+```bash
+./gradlew test jacocoTestReport jacocoTestCoverageVerification --rerun-tasks -Denv=ci -DincludeTags=infra
+```
+
+Область — все вспомогательные классы автоматизации, включая API client, Page Object,
+listeners и fixtures; исключены тела проверок в `tests/{api,ui,e2e,infra,manual}`.
+Пороги lines/branches/instructions/methods = 100. Фильтр тестов больше не сужает
+область измерения. Один infra-запуск не покрывает браузерные утилиты: gate честно падает.
+Это не покрытие Go/Vue. Перед повтором сохраните `build/test-results` и `build/reports`.
+Sonar не имеет сервера по умолчанию; отдельный запуск требует точного разрешённого
+`SONAR_HOST_URL`, совпадающего `SONAR_APPROVED_URL`, и токена через окружение.

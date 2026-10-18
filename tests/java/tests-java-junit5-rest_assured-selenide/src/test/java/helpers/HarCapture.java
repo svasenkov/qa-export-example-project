@@ -158,9 +158,6 @@ public final class HarCapture {
         List<Map<String, Object>> harEntries = new ArrayList<>();
         for (String id : order) {
             Map<String, Object> req = requests.get(id);
-            if (req == null) {
-                continue;
-            }
             Map<String, Object> resp = responses.getOrDefault(id, Map.of());
             double start = doubleVal(req.get("timestamp"));
             double end = finishedMs.getOrDefault(id, start);

@@ -39,7 +39,7 @@ class DeleteAccountTests extends TestBase {
     @DisplayName("Confirming delete account clears the session and navigates to login")
     void confirmingDeleteClearsSessionAndNavigatesToLogin() {
         throwawayUsername = DataFaker.username();
-        AuthApiClient.register(throwawayUsername, PASSWORD);
+        String token = AuthApiClient.register(throwawayUsername, PASSWORD);
 
         homePage.openPageWithLocalStorageAuthentication(throwawayUsername, PASSWORD)
                 .shouldHaveWelcomeMessage("Welcome, " + throwawayUsername + "!")
@@ -48,13 +48,17 @@ class DeleteAccountTests extends TestBase {
                 .shouldHaveFormTitle("Login Form");
 
         homePage.shouldClearAuthToken();
+        io.restassured.RestAssured.given()
+                .header("Authorization", "Bearer " + token)
+                .when().get("/api/auth/me")
+                .then().statusCode(401);
         throwawayUsername = null;
     }
 
     @Test
     @Tag("e2e")
     @Tag("positive")
-    @DisplayName("Cancelling the confirm keeps the session and sends no delete request")
+    @DisplayName("Cancelling deletion keeps the session and account usable")
     void cancellingConfirmKeepsSession() {
         throwawayUsername = DataFaker.username();
         AuthApiClient.register(throwawayUsername, PASSWORD);

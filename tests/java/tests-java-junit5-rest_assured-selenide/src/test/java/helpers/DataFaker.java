@@ -15,14 +15,19 @@ public final class DataFaker {
     }
 
     public static String username() {
-        String base = FAKER.credentials().username().replaceAll("[^A-Za-z0-9]", "");
+        return username(FAKER);
+    }
+
+    /** Test seam: length guards are exercised with a scripted faker. */
+    public static String username(Faker faker) {
+        String base = faker.credentials().username().replaceAll("[^A-Za-z0-9]", "");
         if (base.length() < 3) {
             base = "user" + base;
         }
         if (base.length() > 48) {
             base = base.substring(0, 48);
         }
-        return base + "_" + FAKER.number().digits(6);
+        return base + "_" + faker.number().digits(6);
     }
 
     /** Meets backend password min 6 (credentials.go). */

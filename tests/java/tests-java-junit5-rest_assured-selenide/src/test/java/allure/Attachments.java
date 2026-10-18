@@ -71,10 +71,15 @@ public class Attachments {
 
     @Attachment(value = "Video", type = "text/html", fileExtension = ".html")
     public static String video() {
+        return video(config);
+    }
+
+    /** Test seam: harness coverage drives explicit stub configs. */
+    public static String video(TestConfig testConfig) {
         if (!driverAlive()) {
             return null;
         }
-        String folder = config.videoFolder();
+        String folder = testConfig.videoFolder();
         if (folder == null || folder.isBlank()) {
             return null;
         }
@@ -96,7 +101,12 @@ public class Attachments {
      * No-op on unsupported browsers or when capture produced nothing — never throws.
      */
     public static void harLogs() {
-        if (!driverAlive() || !HarCapture.supportsBrowser(config.browser())) {
+        harLogs(config);
+    }
+
+    /** Test seam: harness coverage drives explicit stub configs. */
+    public static void harLogs(TestConfig testConfig) {
+        if (!driverAlive() || !HarCapture.supportsBrowser(testConfig.browser())) {
             return;
         }
         try {

@@ -24,7 +24,11 @@ public class BrowserDriverProvider implements WebDriverProvider {
 
     @Override
     public WebDriver createDriver(Capabilities ignored) {
-        TestConfig config = ConfigReader.testConfig;
+        return createDriver(ConfigReader.testConfig);
+    }
+
+    /** Test seam: harness coverage drives explicit stub configs. */
+    public WebDriver createDriver(TestConfig config) {
         boolean captureHar = config.enableHar() || config.attachHarLogs();
         if (!config.remoteUrl().isBlank()) {
             return remote(config, captureHar);
@@ -83,7 +87,7 @@ public class BrowserDriverProvider implements WebDriverProvider {
                     "--no-sandbox",
                     "--disable-dev-shm-usage");
         }
-        if (captureHar && HarCapture.supportsBrowser("chrome")) {
+        if (captureHar) {
             HarCapture.enablePerformanceLogging(chrome);
         }
         return chrome;

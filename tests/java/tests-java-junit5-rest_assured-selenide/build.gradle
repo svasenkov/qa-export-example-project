@@ -57,16 +57,18 @@ sonar {
     properties {
         property 'sonar.projectKey', System.getenv('SONAR_PROJECT_KEY') ?: 'autotests-ai-multistack-app-tests-java-junit5-rest_assured-selenide'
         property 'sonar.projectName', System.getenv('SONAR_PROJECT_KEY') ?: 'autotests-ai-multistack-app-tests-java-junit5-rest_assured-selenide'
-        property 'sonar.host.url', System.getenv('SONAR_HOST_URL') ?: 'https://sonar.qa.guru'
+        if (System.getenv('SONAR_HOST_URL')) {
+            property 'sonar.host.url', System.getenv('SONAR_HOST_URL')
+        }
+        property 'sonar.qualitygate.wait', 'true'
         // Test sources as main — Selenide/helpers live under src/test/java.
         property 'sonar.sources', 'src/test/java'
         property 'sonar.tests', ''
         property 'sonar.java.binaries', 'build/classes/java/test'
         property 'sonar.coverage.jacoco.xmlReportPaths',
                 "${layout.buildDirectory.get()}/reports/jacoco/test/jacocoTestReport.xml"
-        // Same allow-list as JaCoCo infra (ConfigReader + CSS helpers). A deny-list
-        // of other helpers lets new page/Allure classes fail Coverage on New Code.
-        property 'sonar.inclusions', '**/config/ConfigReader.java,**/helpers/LayoutCss.java,**/helpers/TokensCss.java'
+        // Same full automation-support scope as JaCoCo; no product coverage claim.
+        property 'sonar.exclusions', '**/tests/api/**,**/tests/ui/**,**/tests/e2e/**,**/tests/infra/**,**/tests/manual/**'
     }
 }
 
@@ -143,14 +145,8 @@ def resolveConfiguredBaseUrl = { String env ->
     throw new GradleException("Set baseUrl in config/${env}.properties")
 }
 
-// JaCoCo is only needed for infra coverage gates; browser/prod layers skip the agent
-// so configuration cache entries do not pin absolute paths under GRADLE_USER_HOME.
-def infraJacocoTags = ['infra', 'infra-backend', 'infra-frontend'] as Set
-
-def jacocoEnabledForCurrentRun = {
-    def tags = (System.getProperty('includeTags') ?: '').split(',').collect { it.trim() }.findAll { it } as Set
-    return tags.isEmpty() || tags.any { infraJacocoTags.contains(it) }
-}
+// Measure automation support for every selected layer, including API/UI/E2E.
+jacoco { toolVersion = '0.8.14' }
 
 // Layers that never touch the app through a browser — nothing to health-check.
 def browserlessTags = ['infra', 'infra-backend', 'infra-frontend', 'api', 'integration'] as Set
@@ -174,6 +170,8 @@ tasks.register('healthCheck') {
     onlyIf { url != null && url.startsWith('http') }
     doLast {
         def client = java.net.http.HttpClient.newBuilder()
+                // Readiness only needs HTTP/1.1; Vite's upgrade handler can leave h2c unanswered.
+                .version(java.net.http.HttpClient.Version.HTTP_1_1)
                 .connectTimeout(java.time.Duration.ofMillis(5000))
                 .build()
         def request = java.net.http.HttpRequest.newBuilder()
@@ -203,7 +201,7 @@ test {
     dependsOn healthCheck
     description = 'Run tests: -Denv=<stand> -DincludeTags=<tags> -DexcludeTags=<tags>'
     jacoco {
-        enabled = jacocoEnabledForCurrentRun()
+        enabled = true
     }
     useJUnitPlatform {
         def includeTagsProp = System.getProperty('includeTags')
@@ -312,37 +310,26 @@ if (allureQualityGateHook && allureReportMode != 'none') {
     }
 }
 
-// Coverage axis = infra helpers; product/page/UI classes are out.
-// Slice follows -DincludeTags: infra-backend → ConfigReader; infra-frontend → CSS helpers
-// (LayoutCss, TokensCss; LocalChromePin is tagged frontend but not JaCoCo-gated);
-// infra / unset → ConfigReader + CSS helpers (local umbrella).
-def infraCoverageIncludes = {
-    def tags = (System.getProperty('includeTags') ?: '').split(',').collect { it.trim() }.findAll { it } as Set
-    def backendOnly = tags.contains('infra-backend') && !tags.contains('infra-frontend') && !tags.contains('infra')
-    def frontendOnly = tags.contains('infra-frontend') && !tags.contains('infra-backend') && !tags.contains('infra')
-    if (backendOnly) {
-        return ['config/ConfigReader.class']
+// All executable automation support, independent of the selected test tags.
+// Test case bodies are checks, not the measured infrastructure.
+def infraCoverageSlice = {
+    sourceSets.test.output.classesDirs.collect { classDir ->
+        fileTree(dir: classDir, excludes: [
+            'tests/api/**', 'tests/ui/**', 'tests/e2e/**', 'tests/infra/**', 'tests/manual/**'
+        ])
     }
-    if (frontendOnly) {
-        return ['helpers/LayoutCss.class', 'helpers/TokensCss.class']
-    }
-    return [
-            'config/ConfigReader.class',
-            'helpers/LayoutCss.class',
-            'helpers/TokensCss.class',
-    ]
 }
 
-def infraCoverageSlice = {
-    def includes = infraCoverageIncludes()
-    sourceSets.test.output.classesDirs.collect { classDir ->
-        fileTree(dir: classDir, include: includes)
-    }
-}
+// Extra exec files from variant-flag runs (attach toggles, allure=none, mock env)
+// land in build/jacoco/union/ and merge into the report + verification.
+// Resolved eagerly: a ConfigurableFileTree here breaks configuration-cache serialization.
+def unionExecFiles = files(
+        (layout.buildDirectory.dir('jacoco/union').get().asFile
+                .listFiles({ f -> f.name.endsWith('.exec') } as FileFilter) ?: []) as List)
 
 tasks.named('jacocoTestReport', JacocoReport).configure {
     group = 'verification'
-    description = 'JaCoCo report for test-infra config + CSS helpers'
+    description = 'JaCoCo report for all automation support classes'
     dependsOn tasks.named('test')
     reports {
         xml.required = true
@@ -350,21 +337,37 @@ tasks.named('jacocoTestReport', JacocoReport).configure {
     }
     classDirectories.setFrom(files(infraCoverageSlice()))
     sourceDirectories.setFrom(files(sourceSets.test.java.srcDirs))
-    executionData.setFrom(layout.buildDirectory.file('jacoco/test.exec'))
+    executionData.setFrom(
+            unionExecFiles + files(layout.buildDirectory.file('jacoco/test.exec')))
 }
 
 tasks.named('jacocoTestCoverageVerification', JacocoCoverageVerification).configure {
     group = 'verification'
-    description = 'Fail when test-infra helpers/config drop below 100% line coverage'
+    description = 'Require 100% lines, branches, instructions and methods of automation support'
     dependsOn tasks.named('jacocoTestReport')
     violationRules {
         rule {
-            limit {
-                counter = 'LINE'
-                minimum = 1.0
+            ['LINE', 'BRANCH', 'INSTRUCTION', 'METHOD'].each { metric ->
+                limit { counter = metric; minimum = 1.0 }
             }
         }
     }
     classDirectories.setFrom(files(infraCoverageSlice()))
-    executionData.setFrom(layout.buildDirectory.file('jacoco/test.exec'))
+    executionData.setFrom(
+            unionExecFiles + files(layout.buildDirectory.file('jacoco/test.exec')))
+}
+
+// A saved URL is not permission to transmit this checkout.
+tasks.named('sonar').configure {
+    dependsOn tasks.named('jacocoTestCoverageVerification')
+    doFirst {
+        if (!System.getenv('SONAR_HOST_URL') ||
+            System.getenv('SONAR_APPROVED_URL') != System.getenv('SONAR_HOST_URL')) {
+            throw new GradleException('BLOCKED: explicitly approve this Sonar URL with SONAR_APPROVED_URL')
+        }
+        def xml = layout.buildDirectory.file('reports/jacoco/test/jacocoTestReport.xml').get().asFile
+        if (!xml.isFile() || xml.length() == 0) {
+            throw new GradleException('Missing JaCoCo report')
+        }
+    }
 }

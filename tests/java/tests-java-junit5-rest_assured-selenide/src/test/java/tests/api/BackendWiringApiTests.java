@@ -39,7 +39,7 @@ class BackendWiringApiTests extends ApiTestBase {
 
     @Test
     @Tag("api")
-    @DisplayName("GET /api/items — catalogue is served from PostgreSQL, not a stub or fallback")
+    @DisplayName("GET /api/items — catalogue reports the PostgreSQL source marker")
     void itemsAreWiredToPostgreSQL() {
         given()
                 .when()

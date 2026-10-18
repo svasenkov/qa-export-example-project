@@ -35,6 +35,11 @@ public final class LocalChromePin {
      * @return Chrome for Testing browser binary (never system Chrome)
      */
     public static Path apply(String browserVersion) {
+        return apply(browserVersion, System::getenv);
+    }
+
+    /** Test seam: harness coverage drives a scripted environment lookup. */
+    public static Path apply(String browserVersion, java.util.function.Function<String, String> getenv) {
         if (browserVersion == null || browserVersion.isBlank()) {
             throw new IllegalStateException(
                     "browserVersion is required for local Chrome (canon: 148). "
@@ -43,16 +48,16 @@ public final class LocalChromePin {
         var version = pinnedVersion();
         requireSameMajor(browserVersion, version);
 
-        var chrome = executableOverride(CHROME_BINARY_ENV);
+        var chrome = executableOverride(CHROME_BINARY_ENV, getenv);
         if (chrome == null) {
-            chrome = chromeBinary(version);
+            chrome = chromeBinary(version, getenv);
         }
         if (!Files.isExecutable(chrome)) {
             throw notInstalled("Chrome " + version + " browser binary", chrome);
         }
-        var driver = executableOverride(CHROMEDRIVER_ENV);
+        var driver = executableOverride(CHROMEDRIVER_ENV, getenv);
         if (driver == null) {
-            driver = chromeDriver(version);
+            driver = chromeDriver(version, getenv);
         }
         if (!Files.isExecutable(driver)) {
             var cached = seleniumCacheDriver(version);
@@ -68,8 +73,9 @@ public final class LocalChromePin {
         return chrome;
     }
 
-    private static Path executableOverride(String environmentVariable) {
-        var value = System.getenv(environmentVariable);
+    private static Path executableOverride(
+            String environmentVariable, java.util.function.Function<String, String> getenv) {
+        var value = getenv.apply(environmentVariable);
         return value == null || value.isBlank() ? null : Path.of(value.trim());
     }
 
@@ -110,65 +116,81 @@ public final class LocalChromePin {
         return version.split("\\.")[0];
     }
 
-    private static Path chromeForTestingRoot() {
-        var override = System.getenv("CHROME_FOR_TESTING_PATH");
+    private static Path chromeForTestingRoot(java.util.function.Function<String, String> getenv) {
+        var override = getenv.apply("CHROME_FOR_TESTING_PATH");
         if (override != null && !override.isBlank()) {
             return Path.of(override.trim());
         }
         return Path.of(System.getProperty("user.home"), ".local/share/chrome-for-testing");
     }
 
-    /** Name of the {@code <platform>-<version>} folder written by scripts/install-chrome-for-testing.sh. */
-    private static String platformDir() {
+    /**
+     * {@code <platform>-<version>} folder names written by
+     * scripts/install-chrome-for-testing.sh plus the matching Selenium cache arch.
+     */
+    private enum PinPlatform {
+        MAC_ARM(
+                "mac_arm",
+                "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+                "chromedriver-mac-arm64/chromedriver",
+                "mac-arm64"),
+        MAC_X64(
+                "mac",
+                "chrome-mac-x64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+                "chromedriver-mac-x64/chromedriver",
+                "mac-x64"),
+        LINUX(
+                "linux",
+                "chrome-linux64/chrome",
+                "chromedriver-linux64/chromedriver",
+                "linux64");
+
+        final String dirName;
+        final String chromeRelPath;
+        final String driverRelPath;
+        final String seleniumArch;
+
+        PinPlatform(String dirName, String chromeRelPath, String driverRelPath, String seleniumArch) {
+            this.dirName = dirName;
+            this.chromeRelPath = chromeRelPath;
+            this.driverRelPath = driverRelPath;
+            this.seleniumArch = seleniumArch;
+        }
+    }
+
+    private static PinPlatform platform() {
         var os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         var arch = System.getProperty("os.arch", "").toLowerCase(Locale.ROOT);
         if (os.contains("mac")) {
-            return arch.contains("aarch64") || arch.contains("arm") ? "mac_arm" : "mac";
+            return arch.contains("aarch64") || arch.contains("arm") ? PinPlatform.MAC_ARM : PinPlatform.MAC_X64;
         }
         if (os.contains("linux")) {
-            return "linux";
+            return PinPlatform.LINUX;
         }
         throw new IllegalStateException("Unsupported OS for LocalChromePin: " + os);
     }
 
-    private static String seleniumCacheArch() {
-        return switch (platformDir()) {
-            case "mac_arm" -> "mac-arm64";
-            case "mac" -> "mac-x64";
-            case "linux" -> "linux64";
-            default -> throw new IllegalStateException("Unsupported platform: " + platformDir());
-        };
-    }
-
-    private static Path chromeBinary(String version) {
-        var versionDir = chromeForTestingRoot()
+    private static Path chromeBinary(
+            String version, java.util.function.Function<String, String> getenv) {
+        var platform = platform();
+        return chromeForTestingRoot(getenv)
                 .resolve("chrome")
-                .resolve(platformDir() + "-" + version);
-        return switch (platformDir()) {
-            case "mac_arm" -> versionDir.resolve(
-                    "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing");
-            case "mac" -> versionDir.resolve(
-                    "chrome-mac-x64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing");
-            case "linux" -> versionDir.resolve("chrome-linux64/chrome");
-            default -> throw new IllegalStateException("Unsupported platform: " + platformDir());
-        };
+                .resolve(platform.dirName + "-" + version)
+                .resolve(platform.chromeRelPath);
     }
 
-    private static Path chromeDriver(String version) {
-        var versionDir = chromeForTestingRoot()
+    private static Path chromeDriver(
+            String version, java.util.function.Function<String, String> getenv) {
+        var platform = platform();
+        return chromeForTestingRoot(getenv)
                 .resolve("chromedriver")
-                .resolve(platformDir() + "-" + version);
-        return switch (platformDir()) {
-            case "mac_arm" -> versionDir.resolve("chromedriver-mac-arm64/chromedriver");
-            case "mac" -> versionDir.resolve("chromedriver-mac-x64/chromedriver");
-            case "linux" -> versionDir.resolve("chromedriver-linux64/chromedriver");
-            default -> throw new IllegalStateException("Unsupported platform: " + platformDir());
-        };
+                .resolve(platform.dirName + "-" + version)
+                .resolve(platform.driverRelPath);
     }
 
     private static Path seleniumCacheDriver(String version) {
         return Path.of(System.getProperty("user.home"), ".cache/selenium/chromedriver")
-                .resolve(seleniumCacheArch())
+                .resolve(platform().seleniumArch)
                 .resolve(version)
                 .resolve("chromedriver");
     }
