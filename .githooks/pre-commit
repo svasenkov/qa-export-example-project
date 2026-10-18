@@ -10,8 +10,14 @@ set -e
 cd "$(git rev-parse --show-toplevel)"
 
 echo "pre-commit: staged-файлы без типовых форматов секретов"
-if git grep --cached -qE 'BEGIN [A-Z ]*PRIVATE KEY|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[0-9A-Za-z-]{10,}|AKIA[0-9A-Z]{16}'; then
+scan_status=0
+git grep --cached -qE 'BEGIN [A-Z ]*PRIVATE KEY|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[0-9A-Za-z-]{10,}|AKIA[0-9A-Z]{16}' || scan_status=$?
+if [ "$scan_status" -eq 0 ]; then
   echo "ОШИБКА: в staged-файлах найдено похожее на секрет значение." >&2
   echo "Уберите его из индекса. Осознанный обход: git commit --no-verify" >&2
+  exit 1
+fi
+if [ "$scan_status" -ne 1 ]; then
+  echo "ОШИБКА: проверка staged-файлов не выполнена (git grep)." >&2
   exit 1
 fi

@@ -1,0 +1,8 @@
+{
+  "go": {
+    "internal/api/dto.go": {
+      "sha256": "0409b668c7930fd90733ebedb62c36814151e24a3630597abd4c7e4a03c9c76d",
+      "reason": "Only Go struct type declarations; no statements, functions or initializers."
+    }
+  }
+}
