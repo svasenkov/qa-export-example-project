@@ -61,8 +61,9 @@ Mock gateway по умолчанию использует порт `9911`. Ис�
 в [tools/openspec](tools/openspec/README.md). Сценарии, наличие тестов и результаты
 их выполнения учитываются отдельно.
 
-Каталоги [agents/](agents/README.md) и [eval/](eval/README.md) подготовлены для
-будущих определений агентов и оценки их работы; runtime и runner пока не выбраны.
+[agents/](agents/README.md) содержит определения будущих runtime.
+[eval/](eval/README.md) содержит изолированные задачи и контроль oracle;
+повторяемый model runner пока не подключён и его результаты заблокированы.
 
 ## Работа с агентом
 
@@ -88,4 +89,4 @@ git config core.hooksPath .githooks
 
 ## CI
 
-Корневой workflow — [.github/workflows/ci.yml](.github/workflows/ci.yml). Он проверяет структуру OpenSpec (`openspec-check`), конфигурацию Compose (`compose-check`), запускает unit и PostgreSQL-integration тесты backend, typecheck/component/build frontend, infra-тесты тестового модуля, ui на mock-стенде и api+e2e на живом compose-стенде раннера. Команды джобов — те же, что в README модулей. Деплоя, Sonar и внешних стендов в workflow нет; его фактический результат подтверждается только прогоном на GitHub.
+Корневой workflow — [.github/workflows/ci.yml](.github/workflows/ci.yml). Он проверяет структуру OpenSpec (`openspec-check`), конфигурацию Compose (`compose-check`), запускает unit и PostgreSQL-integration тесты backend, typecheck/component/build frontend, infra-тесты тестового модуля, ui на mock-стенде и api+e2e на живом compose-стенде раннера. Команды джобов — те же, что в README модулей. Проверки coverage, целостности доказательств, controls harness и итоговый reference-ready разделены. Sonar и model behavior пока имеют явно блокирующие jobs; анализа и model runner нет. Фактический результат CI подтверждается только прогоном на GitHub. Текущее состояние и остаток — в [reference-quality](docs/qa/reference-quality.md).

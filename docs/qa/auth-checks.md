@@ -5,6 +5,10 @@
 Это навигация по существующим тестам, **не отчёт об их выполнении**. Перед выводом
 о покрытии читай актуальное тело теста и результаты конкретного запуска.
 Правила учёта — в [testing.md](testing.md).
+Карта 46 сценариев и исходный дефект длинных паролей —
+в [аудите 18 октября 2026](auth-audit-2026-10-18.md). Исправление AUTH-003,
+согласованная совместимость AUTH-004 и новые результаты —
+в [текущем отчёте](reference-quality.md). Старый аудит сохраняется как история.
 
 ## Вход: AUTH-001–AUTH-003
 
@@ -46,12 +50,12 @@ API-проверки `AuthApiTests#loginRejects*` и `registerRejects*` пров
 из ресурсов Java-модуля. Эти схемы не являются автоматически сгенерированной
 копией OpenAPI.
 
-E2E `LoginTests` и `RegisterTests` используют точные английские сообщения.
-Component-проверки валидации утверждают показанный текст. В исходном описании
-отмечен пробел: они не наблюдают отсутствие fetch для всех ошибок валидации,
-а браузерные тесты не утверждают отсутствие запроса `/api/auth/*`.
-При переносе это требование **не считается доказанным**. Проверять сообщение
-недостаточно: английский `errorWrongCredentials` совпадает с текстом HTTP 401.
+[AuthForms.test.ts](../../frontend/typescript/frontend-typescript-vue/src/test/pages/AuthForms.test.ts)
+проверяет обе формы с точными en/ru сообщениями и отсутствием fetch, токена и
+навигации при клиентской ошибке. Также проверяются trimming, порядок ошибок,
+границы, передача превышения максимума серверу и все варианты API-сообщений.
+Локальная валидация удалена из E2E: backend для этих проверок не нужен.
+E2E сохраняют реальные серверные отказы, а HAR остаётся только диагностикой.
 
 `TestBase` может прикладывать HAR через `attachHarLogs` / `HarCapture` для
 диагностики; наличие HAR не является assertion. Для русского E2E язык нужно
@@ -79,9 +83,13 @@ Component: [HomePage.test.ts](../../frontend/typescript/frontend-typescript-vue/
 
 [auth.test.ts](../../frontend/typescript/frontend-typescript-vue/src/test/lib/auth.test.ts)
 проверяет очистку токена при завершении или отклонении запроса выхода.
-Зависший запрос в перенесённом перечне проверок не покрыт; реализация ждёт ответ.
+`HomePage.test.ts` теперь проверяет pending-запросы logout/delete: до завершения
+токен, route и приветствие сохраняются; после ответа или ошибки сессия очищается.
+Ошибки профиля 401/500/offline тоже наблюдаются component-тестами.
 HTTP 204 выхода сам по себе не доказывает очистку localStorage или переход страницы.
 
+[session-mount.test.ts](../../frontend/typescript/frontend-typescript-vue/src/test/lib/session-mount.test.ts)
+проверяет root/matrix storage и Bearer для GET/DELETE, сохраняя чужой namespace.
 Ключ токена выбирается через `authTokenStorageKey` в `appBase.ts` frontend-модуля;
 Java `BasePage` вычисляет его по pathname через `AUTH_TOKEN_KEY_JS`.
 Backend использует stateless JWT (`internal/security/jwt.go`), не cookie-сессию;
