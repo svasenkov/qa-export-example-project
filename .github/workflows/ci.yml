@@ -583,7 +583,7 @@ jobs:
           curl -fsSLO "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-${SONAR_SCANNER_VERSION}.zip"
           unzip -q "sonar-scanner-cli-${SONAR_SCANNER_VERSION}.zip"
           echo "$PWD/sonar-scanner-${SONAR_SCANNER_VERSION}/bin" >> "$GITHUB_PATH"
-          sonar-scanner --version
+          "$PWD/sonar-scanner-${SONAR_SCANNER_VERSION}/bin/sonar-scanner" --version
       - name: Bring up the stand
         run: |
           docker compose --profile mock up -d --build
