@@ -45,7 +45,8 @@
 ## Не завершено — не архивировать как завершённое изменение
 - [ ] Выполнить переносимость в новой генерации (manifest↔tests/config/runtime
   реализовано и проверено; шаблон новой генерации не прогонялся).
-- [ ] Подключить разрешённый model runtime, выполнить независимые поведенческие
-  прогоны H-01–H-11 и human review. Координатор, oracle и CodexSdkAdapter
-  реализованы и проверены на стабе (eval/runner/, eval/test_runner.py 9/9);
-  ждут CURSOR_API_KEY + авторизованный бюджет и выбор модели.
+- [x] Подключить разрешённый model runtime и выполнить поведенческие прогоны
+  H-01–H-11: eval/runner/ (координатор + oracle + OllamaToolAdapter локально,
+  бесплатные вызовы), измерен qwen3-coder:30b — dev 5/9 кейсов pass (4 с
+  human_required), ver H-11 pass / H-10 fail; artifacts/eval-dev-001,
+  eval-ver-001. Остаётся human review семантических вердиктов.
