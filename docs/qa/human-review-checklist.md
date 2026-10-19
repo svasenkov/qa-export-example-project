@@ -6,11 +6,11 @@
 
 ## 1. Требования (OpenSpec)
 
-- [ ] `openspec/changes/product-scope/proposal.md` — раздел «Решения»
+- [ ] `openspec/changes/archive/2026-10-20-product-scope/proposal.md` — раздел «Решения»
   соответствует тому, что вы утверждали (каталог read-only, поиск пассивный,
   Stage/Prod везде, dark/en/zds-*, axe двух уровней, PWA offline-smoke,
   Lighthouse отложен).
-- [ ] `openspec/changes/product-scope/specs/*/spec.md` — формулировки
+- [ ] `openspec/changes/archive/2026-10-20-product-scope/specs/*/spec.md` — формулировки
   требований совпадают с наблюдаемым поведением приложения (откройте
   главную/логин/регистрацию на стенде и сверьте глазами).
 - [ ] Backlog-список в `tasks.md` (non-goals) — не содержит того, что

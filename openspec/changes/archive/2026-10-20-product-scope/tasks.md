@@ -33,12 +33,15 @@
 - [x] Golden-скриншоты пересняты на linux-окружении (контейнер linux/amd64,
   pin-Chrome 148.0.7778.178) — 7 файлов под визуальные правки; compare-прогон
   в том же окружении зелёный 12/12.
-- [ ] Свежие доказательства coverage по `tools/quality` (begin → прогон → check)
+- [x] Свежие доказательства coverage по `tools/quality` (begin → прогон → check)
   на изолированном стенде для затронутых доменов; CI-прогон зелёный.
+  Frontend/Go/Java-гейты прошли в прогонах 39275727368, 39288685527
+  (frontend coverage gate, Go coverage gate, JaCoCo union 1259/1259).
 - [x] Пробел покрытия: живая отдача PWA-артефактов через gateway — `PwaAssetsApiTests`.
 - [x] Пробел покрытия: пустой каталог на UI-уровне — `HomeEmptyItemsTests` +
   mock-сценарий `items-empty`.
-- [ ] Обновить связи требование → проверка в `docs/qa/` и reference-quality.
+- [x] Обновить связи требование → проверка в `docs/qa/` и reference-quality
+  (раздел «Объём product scope» перечисляет capability → проверки).
 
 ## Backlog (non-goals, вне этого change)
 - Поведение поиска в шапке (поле остаётся пассивным по SHELL-009).

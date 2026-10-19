@@ -7,10 +7,13 @@
 владельцем 19.10 — решения применены в `product-scope` (реализованные пункты
 покрыты: axe-гейт двух уровней, offline-оболочка, переснятые linux-goldens);
 branch protection **применён** (репо стал публичным, 9 required checks,
-strict=true, linear history). Блокерами остаются: независимый model runtime
-для H-01–H-11 и human review. Активные OpenSpec changes
-[reference-quality](../../openspec/changes/reference-quality/proposal.md) и
-[product-scope](../../openspec/changes/product-scope/proposal.md) не архивированы.
+strict=true, linear history). Поведенческий eval выполнен (локальный Ollama
+runtime, результаты ниже); остаётся human review. OpenSpec change
+[product-scope](../../openspec/changes/archive/2026-10-20-product-scope/proposal.md)
+архивирован — спеки app-shell/catalog/pwa/service-status перенесены в
+`openspec/specs/`; активен только
+[reference-quality](../../openspec/changes/reference-quality/proposal.md)
+(ждёт human review).
 
 ## Исправления
 
@@ -130,7 +133,7 @@ macOS arm64 зафиксирован справочно: 2/12 (missing goldens +
 Системный Chrome в прогонах не участвовал.
 
 Объём product scope **согласован владельцем** в OpenSpec change
-[product-scope](../../openspec/changes/product-scope/proposal.md): app shell
+[product-scope](../../openspec/changes/archive/2026-10-20-product-scope/proposal.md): app shell
 (header/navigation/layout, пассивный поиск, Stage/Prod везде, дефолты
 dark/en/zds-*, двухуровневый axe-гейт), каталог (read-only демо-список,
 4 состояния), service status, PWA (артефакты + unit-регистрация +
