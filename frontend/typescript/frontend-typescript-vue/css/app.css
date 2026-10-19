@@ -19,3 +19,25 @@ body {
 .multistack__error {
   color: var(--color-danger, #e55);
 }
+
+/* SHELL-010: raise muted text above WCAG AA on every surface it occupies
+   (panel bar #413f3c dark / #ffffff light are the tightest pairs). */
+:root {
+  --color-text-muted: rgba(255, 255, 255, 0.7);
+}
+
+html.theme-light {
+  --color-text-muted: rgba(15, 23, 42, 0.65);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}

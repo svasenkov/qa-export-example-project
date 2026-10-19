@@ -34,6 +34,7 @@ buildscript {
         jacksonVersion      = '2.22.3'
         ownerVersion        = '1.0.12'
         datafakerVersion    = '2.7.0'
+        axeSeleniumVersion  = '4.10.1'
         allureAttachmentsVersion = '2.35.5'
         testParallelForks   = 1
         defaultEnv          = 'ci'
@@ -114,6 +115,8 @@ dependencies {
             "io.rest-assured:json-schema-validator:${restAssuredVersion}",
             "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}",
             "net.datafaker:datafaker:${datafakerVersion}",
+            // Browser-level a11y audit (Deque axe-core) for SHELL-010.
+            "com.deque.html.axe-core:selenium:${axeSeleniumVersion}",
             'io.qameta.allure:allure-rest-assured',
             // not in allure-bom 3.x (dropped upstream); powers helpers.AllureHttpHtml ftl rendering
             "io.qameta.allure:allure-attachments:${allureAttachmentsVersion}")

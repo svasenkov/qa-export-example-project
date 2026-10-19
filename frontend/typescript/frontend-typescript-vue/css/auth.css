@@ -41,7 +41,7 @@ body {
 
 .auth-footer-link a {
   color: var(--color-primary);
-  text-decoration: none;
+  text-decoration: underline;
 }
 
 .auth-footer-link a:hover {

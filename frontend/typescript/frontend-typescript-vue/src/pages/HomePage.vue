@@ -128,6 +128,7 @@ function itemsErrorText(message: string): string {
     class="page-shell page-shell--below-header grid multistack"
     data-testid="multistack-layout"
   >
+    <h1 class="visually-hidden">{{ copy.home.title }}</h1>
     <Panel :title="copy.home.title">
       <p class="text text--muted">
         {{ blurbParts[0] }}<code>/api/items</code>{{ blurbParts[1] }}

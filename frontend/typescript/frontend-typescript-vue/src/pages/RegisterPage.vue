@@ -95,6 +95,7 @@ async function handleSubmit(event: Event): Promise<void> {
 
 <template>
   <main class="auth-page">
+    <h1 class="visually-hidden">{{ copy.register.title }}</h1>
     <Panel
       :title="copy.register.title"
       title-test-id="register-form-title"

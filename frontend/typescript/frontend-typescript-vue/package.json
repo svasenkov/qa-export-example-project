@@ -25,6 +25,7 @@
     "@vue/test-utils": "^2.4.11",
     "allure-js-commons": "^3.10.2",
     "allure-vitest": "^3.10.2",
+    "axe-core": "^4.14.0",
     "jsdom": "^30.0.1",
     "typescript": "6.0.3",
     "vite": "^8.2.1",
