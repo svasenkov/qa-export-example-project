@@ -1,13 +1,14 @@
 # Состояние основы QA — 19 октября 2026
 
 **Готовность: НЕ ДОСТИГНУТА.** Измеряемые gates продуктового и Java-infrastructure
-кода проходят на 100%; GitHub workflow выполнен и полностью зелёный
-([run 39252131337](https://github.com/svasenkov/qa-export-example-project/actions/runs/39252131337),
-все 9 джобов, включая реальный `sonar-gate`). Блокерами остаются: согласование
-полного product scope (change `product-scope` подготовлен, но не утверждён),
-branch protection (упирается в тариф GitHub — приватный репозиторий на free
-не даёт required checks; готовый payload сохранён), независимый model runtime
-и human review. Активные OpenSpec changes
+кода проходят на 100%; GitHub workflow выполнен и полностью зелёный дважды
+подряд (последний — [run 39272807675](https://github.com/svasenkov/qa-export-example-project/actions/runs/39272807675)
+на `d96ab72`, все 9 джобов включая `sonar-gate`). Product scope **согласован**
+владельцем 19.10 — решения применены в `product-scope` (реализованные пункты
+покрыты: axe-гейт двух уровней, offline-оболочка, переснятые linux-goldens);
+branch protection **применён** (репо стал публичным, 9 required checks,
+strict=true, linear history). Блокерами остаются: независимый model runtime
+для H-01–H-11 и human review. Активные OpenSpec changes
 [reference-quality](../../openspec/changes/reference-quality/proposal.md) и
 [product-scope](../../openspec/changes/product-scope/proposal.md) не архивированы.
 
@@ -118,26 +119,31 @@ Compose-стенде (go-stdlib + vue через `deploy/ci/nginx.conf`) — з�
 
 Screenshot-tag выполнен на обоих окружениях. Каноническое — linux CI
 (`SCREENSHOT_OS=linux`, pin 148.0.7778.178 через `install-chrome-for-testing.sh`
-в job `ui-mock-tests`): screenshot-набор **зелёный** в run 39252131337.
-Локальный прогон на macOS arm64 против изолированного стенда `qa-review-1019`
-зафиксирован как справочный: 12 тестов, 2 зелёных (burger-menu), 10 падений —
-отсутствующие golden-файлы для welcome/home/login-вариантов и diff шапки
-5.44% (390px), 3.96% (768px), 6.56% (1280px) при пороге 1.50% — причина
-окружения (шрифты/сглаживание), эталоны НЕ переписаны, статистика в
+в job `ui-mock-tests`): screenshot-набор **зелёный** в runs 39252131337,
+39254310359 и 39272807675 — включая compare после пересъёмки goldens под
+a11y-фиксы (7 файлов; пересняты в linux/amd64-контейнере с тем же pin-Chrome,
+compare в том же окружении и на GHA зелёный 12/12 — осознанная регенерация
+под изменение продукта, не «чтобы зелёным было»). Локальный прогон на
+macOS arm64 зафиксирован справочно: 2/12 (missing goldens + diff шапки
+5.44%/3.96%/6.56% при пороге 1.50%) — окружение, статистика в
 [artifacts/reference-2026-10-19-screenshot](../../artifacts/reference-2026-10-19-screenshot/).
-Системный Chrome в прогонах не участвовал; pin подтверждён фактическим запуском
-на обоих окружениях.
+Системный Chrome в прогонах не участвовал.
 
-Объём product scope зафиксирован в OpenSpec change
+Объём product scope **согласован владельцем** в OpenSpec change
 [product-scope](../../openspec/changes/product-scope/proposal.md): app shell
-(header/navigation/layout), каталог с пустым состоянием, service status, PWA.
-Change провалидирован (`npm run validate --prefix tools/openspec` — 6/6),
-но требует согласования с владельцем: design.md содержит открытые вопросы,
-требования не выдумывались. Уже реализованное поведение покрыто новыми тестами:
-атрибуты поиска шапки (desktop/menu), пустой каталог (`HomeEmptyItemsTests` +
-mock-маппинг `items-empty`), отдача manifest/service worker/icon
-(`PwaAssetsApiTests`). Схемы HTTP ошибок/ограничения форм в OpenAPI остаются
-неполными — зафиксировано вопросами в change.
+(header/navigation/layout, пассивный поиск, Stage/Prod везде, дефолты
+dark/en/zds-*, двухуровневый axe-гейт), каталог (read-only демо-список,
+4 состояния), service status, PWA (артефакты + unit-регистрация +
+offline-оболочка; Lighthouse CI и install UX — backlog). Change провалидирован
+(`npm run validate --prefix tools/openspec` — 6/6). Реализация покрыта:
+атрибуты поиска шапки, пустой каталог (`HomeEmptyItemsTests` + `items-empty`),
+PWA-артефакты (`PwaAssetsApiTests`), axe-аудит браузерный
+(`AccessibilityAxeTests`, Deque 4.10.1) и component (`a11y.test.ts`,
+axe-core 4.14.0), offline-оболочка (`PwaOfflineSmokeTests`, CDP). Первый
+браузерный аудит нашёл реальные нарушения (контраст muted-текста, ссылки
+только цветом, отсутствие h1) — исправлены в продукте app-уровнем без правок
+vendor DS; повторный аудит чист, goldens пересняты на linux. Схемы HTTP
+ошибок/ограничения форм в OpenAPI остаются неполными — отдельный вопрос.
 
 ## Б. Инфраструктура
 
@@ -153,19 +159,18 @@ mock-маппинг `items-empty`), отдача manifest/service worker/icon
   в измеряемых областях → PASS для Go/frontend/Java-infra срезов.
 - I-07 Отчётность → Allure helpers покрыты harness-тестами; Node coverage
   по-прежнему отражает только загруженные файлы.
-- I-08 CI → **RUN, зелёный**. GitHub Actions
-  [run 39252131337](https://github.com/svasenkov/qa-export-example-project/actions/runs/39252131337)
-  (push `727cffe`, 2026-10-19): все 9 джобов `success` — checks, backend-unit,
-  backend-integration, frontend-unit, infra, ui-mock, api, e2e, sonar-gate.
-  Evidence: [artifacts/reference-2026-10-19-github-run](../../artifacts/reference-2026-10-19-github-run/).
-  По пути исправлены реальные дефекты: SCRAM-auth для тестовых PostgreSQL-ролей
-  (docker-образ с паролем требует пароль у роли), гонка глобального Allure
-  lifecycle (`AttachmentsHarnessTest` теперь `@Isolated`), установка pin-Chrome
-  в infra/sonar джобах, порядок шагов PATH для sonar-scanner и host-dependent
-  ветки `ScreenshotHelper` (покрыты детерминированно через швы).
-  Branch protection: API вернул 403 — required checks недоступны на free-тарифе
-  для приватного репо; payload с 9 contexts и strict=true сохранён в
-  `branch-protection-required.json` для владельца.
+- I-08 CI → **RUN, зелёный**. GitHub Actions: серия прогонов 19.10
+  (39244431007 → [39272807675](https://github.com/svasenkov/qa-export-example-project/actions/runs/39272807675)),
+  три подряд полностью зелёных — все 9 джобов `success`. Evidence:
+  [artifacts/reference-2026-10-19-github-run](../../artifacts/reference-2026-10-19-github-run/).
+  По пути исправлены реальные дефекты: SCRAM-auth для тестовых PostgreSQL-ролей,
+  гонка глобального Allure lifecycle (`@Isolated`), установка pin-Chrome в
+  infra/sonar джобах, порядок шагов PATH для sonar-scanner и host-dependent
+  ветки `ScreenshotHelper` (детерминированные швы).
+  **Branch protection применён** 19.10: после смены видимости репо на public
+  payload принят — 9 required contexts, strict=true, enforce_admins,
+  required_linear_history, запрет force-push/deletions
+  (`branch-protection-applied.json`).
 - I-09 Sonar → `https://sonar.qa.guru` (авторизованный сервер): все три модуля
   проанализированы в CI, server Quality Gate **OK** для каждого projectKey
   (`sonar.qualitygate.wait=true` в sonar.sh и Gradle; `BUILD SUCCESSFUL` в
@@ -243,14 +248,14 @@ jacocoTestReport.xml и run-JSON артефактом (проверено на �
 до изолированного model runner и исключён из CI — статус фиксируется в
 [eval/README.md](../../eval/README.md), а не красной заглушкой в workflow.
 
-GitHub workflow: пять реальных прогонов 19.10 (39244431007 → 39252131337).
-Первые четыре ловили реальные дефекты (PostgreSQL SCRAM-роли, Allure-гонка,
-отсутствие pin-Chrome в infra/sonar, порядок PATH, host-dependent JaCoCo-ветки);
-финальный — полностью зелёный. Evidence по каждому сохранён в
-`artifacts/reference-2026-10-19-github-run/`. Branch protection не включён:
-GitHub API вернул 403 (required checks недоступны приватному репо на
-free-тарифе); готовый payload и команда — в
-`branch-protection-required.json`/`branch-protection-BLOCKED.md` для владельца.
+GitHub workflow: серия реальных прогонов 19.10 (39244431007 → 39272807675).
+Первые ловили реальные дефекты (PostgreSQL SCRAM-роли, Allure-гонка,
+отсутствие pin-Chrome в infra/sonar, порядок PATH, host-dependent
+JaCoCo-ветки); три последних — полностью зелёные, включая прогон с новыми
+a11y/offline-тестами и переснятыми goldens. Evidence по каждому сохранён в
+`artifacts/reference-2026-10-19-github-run/`. Branch protection применён —
+все 9 джобов required, strict=true (репо переведён в public по решению
+владельца; до этого API возвращал 403).
 
 Docker-упаковка подтверждена полностью: холодный `docker compose up -d --build`
 из чистого detached-worktree `qa-clean-1019` (проект и порты свои, ~37s build):
@@ -278,14 +283,13 @@ README и измеритель своего языка; общие механи�
 Контрольный дефект обязан обнаруживаться, неверная конфигурация отклоняться.
 До собственного успешного прогона новая генерация не получает статус соответствия.
 
-Остаток конкретен: согласование product-scope change с владельцем (предложение
-оформлено, вопросы в design.md), включение branch protection (нужен GitHub Pro
-или публичный репо — payload готов), независимый model runtime для H-01–H-11
-и human review. CI пройден полностью (9/9, включая реальный sonar-gate с
-тремя server Quality Gate OK); compose-холодный старт и screenshot-набор
-проверены. Связь manifests с tests/config/runtime реализована в
-`tools/quality` и проверена на свежих прогонах go/frontend/jacoco — после
-добавления тестов union-евиденс пересобран и зелёный.
+Остаток конкретен: независимый model runtime для H-01–H-11 и human review
+(чеклист — `docs/qa/human-review-checklist.md`). Product scope согласован и
+реализован по решениям владельца (a11y-гейт двух уровней нашёл и закрыл
+реальные дефекты; offline-оболочка покрыта); branch protection применён
+(9 checks, strict). CI пройден полностью трижды подряд (9/9, включая
+реальный sonar-gate с тремя server Quality Gate OK); compose-холодный
+старт и screenshot-набор проверены на каноническом linux.
 
 Официальные основания параметров: [Vitest coverage](https://vitest.dev/guide/coverage.html),
 [Gradle JaCoCo](https://docs.gradle.org/current/userguide/jacoco_plugin.html),
