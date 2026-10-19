@@ -10,8 +10,11 @@ import io.qameta.allure.Severity;
 import io.qameta.allure.SeverityLevel;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.parallel.Isolated;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.openqa.selenium.logging.LogEntries;
 import org.openqa.selenium.logging.LogEntry;
 import tests.AllureMeta;
@@ -28,7 +31,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * {@link Attachments} — attachment guards and driver-error fallbacks against a
  * scripted driver. The video/har config branches that require a non-default
- * config run in the {@code infra-attach} Gradle fork.
+ * config run in the {@code infra-attach} Gradle fork. Isolated + same-thread:
+ * {@code harLogsConfigBranches} swaps the global Allure lifecycle, which would
+ * otherwise leak "simulated allure failure" into parallel classes.
  */
 @Layer("infra")
 @Epic("Test infra")
@@ -37,6 +42,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag("infra")
 @Tag("infra-frontend")
 @DisplayName("Attachments")
+@Isolated
+@Execution(ExecutionMode.SAME_THREAD)
 class AttachmentsHarnessTest extends AllureMeta {
 
     @AfterEach
