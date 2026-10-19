@@ -198,18 +198,45 @@ class ScreenshotHelperHarnessTest extends AllureMeta {
     }
 
     @Test
-    @DisplayName("unreadable element screenshot and unreadable golden → UncheckedIOException")
+    @DisplayName("unreadable element screenshot, directory and non-image goldens → UncheckedIOException")
     void ioFailures() throws IOException {
         assertThrows(UncheckedIOException.class, () ->
                 ScreenshotHelper.captureAndCompare(
                         elementReturning(null, true), "io-probe", VIEWPORT, "probe"));
 
-        // golden present as a directory → exists() but readAllBytes throws
-        var dir = goldenDir("io-probe").resolve(VIEWPORT + ".png");
-        Files.createDirectories(dir);
-        assertThrows(UncheckedIOException.class, () ->
-                ScreenshotHelper.captureAndCompare(
-                        elementReturning(png(1, 1, 0), false), "io-probe", VIEWPORT, "probe"));
+        var goldenPath = goldenDir("io-probe").resolve(VIEWPORT + ".png");
+        try {
+            // golden present as a directory → exists() but readAllBytes throws
+            Files.createDirectories(goldenPath);
+            assertThrows(UncheckedIOException.class, () ->
+                    ScreenshotHelper.captureAndCompare(
+                            elementReturning(png(1, 1, 0), false), "io-probe", VIEWPORT, "probe"));
+
+            // golden present with non-image bytes → ImageIO.read returns null
+            deleteRecursively(goldenPath);
+            Files.write(goldenPath, new byte[]{1, 2, 3});
+            assertThrows(UncheckedIOException.class, () ->
+                    ScreenshotHelper.captureAndCompare(
+                            elementReturning(png(1, 1, 0), false), "io-probe", VIEWPORT, "probe"));
+        } finally {
+            deleteRecursively(goldenPath);
+            try {
+                Files.delete(goldenPath.getParent());
+            } catch (IOException ignored) {
+                // parent still has committed content — leave it
+            }
+        }
+    }
+
+    private static void deleteRecursively(Path path) throws IOException {
+        if (!Files.exists(path)) {
+            return;
+        }
+        try (var walk = Files.walk(path)) {
+            for (var p : walk.sorted((a, b) -> b.compareTo(a)).toList()) {
+                Files.deleteIfExists(p);
+            }
+        }
     }
 
     private static TestConfig config(Map<String, Object> overrides) {
@@ -291,10 +318,11 @@ class ScreenshotHelperHarnessTest extends AllureMeta {
     }
 
     @Test
-    @DisplayName("osFamily maps win/linux/unknown")
+    @DisplayName("osFamily maps mac/darwin/win/linux/unknown")
     void osFamilyMapping() {
-        assertEquals("win32", ScreenshotHelper.osFamily("Windows 11"));
+        assertEquals("darwin", ScreenshotHelper.osFamily("Mac OS X"));
         assertEquals("darwin", ScreenshotHelper.osFamily("Darwin 24"));
+        assertEquals("win32", ScreenshotHelper.osFamily("Windows 11"));
         assertEquals("linux", ScreenshotHelper.osFamily("FreeBSD"));
     }
 
