@@ -24,9 +24,17 @@
 пункт, меню, язык/тема и раскладка в браузере — ui на mock-стенде;
 критический путь «главная грузит health+items» — e2e на живом compose.
 
-## Открытые вопросы
+## Решения по открытым вопросам
 
-Список — в `proposal.md`. Спорное поведение в дельты не внесено: пассивное поле
-поиска в шапке, видимость Stage/Prod-переключателей на учебном стенде, объём
-каталога сверх read-only, границы a11y-аудита, необходимость браузерного
-PWA-сценария.
+Утверждены владельцем 2026-10-19 (см. `proposal.md` → «Решения»): каталог —
+read-only демо-список; поиск шапки — пассивный элемент + backlog-задача;
+Stage/Prod видны везде; дефолты `dark`/`en`/`zds-*` — контракт; a11y —
+автоматизированный аудит двух уровней (vitest-axe + axe-selenium-java);
+PWA — артефакты + unit-регистрация + offline-smoke по CDP; Lighthouse CI и
+install UX отложены.
+
+Новая реализация в рамках change: `vitest-axe` component-проверки,
+`axe-selenium-java` UI-прогон на mock-стенде (Home/Login/Register),
+offline-smoke тест через Selenium DevTools (`Network.emulateNetworkConditions`).
+Backlog (non-goals): поведение поиска шапки, Lighthouse CI, браузерный
+install/offline-UX сценарий, ручной WCAG-аудит.
