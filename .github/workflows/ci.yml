@@ -584,6 +584,19 @@ jobs:
           unzip -q "sonar-scanner-cli-${SONAR_SCANNER_VERSION}.zip"
           echo "$PWD/sonar-scanner-${SONAR_SCANNER_VERSION}/bin" >> "$GITHUB_PATH"
           "$PWD/sonar-scanner-${SONAR_SCANNER_VERSION}/bin/sonar-scanner" --version
+      - name: Read Chrome for Testing pin
+        id: chrome-pin
+        working-directory: ${{ env.TESTS_DIR }}
+        run: echo "version=$(bash scripts/install-chrome-for-testing.sh --print-version)" >> "$GITHUB_OUTPUT"
+      - name: Cache Chrome for Testing
+        continue-on-error: true
+        uses: actions/cache@v6
+        with:
+          path: ~/.local/share/chrome-for-testing
+          key: chrome-for-testing-pin-${{ runner.os }}-${{ runner.arch }}-${{ steps.chrome-pin.outputs.version }}
+      - name: Install pinned Chrome for Testing
+        working-directory: ${{ env.TESTS_DIR }}
+        run: bash scripts/install-chrome-for-testing.sh
       - name: Bring up the stand
         run: |
           docker compose --profile mock up -d --build
