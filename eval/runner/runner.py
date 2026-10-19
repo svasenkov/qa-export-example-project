@@ -102,7 +102,7 @@ def run(destination: Path, split: str, adapter, attempts: int = 3,
     return report
 
 
-if __name__ == '__main__':
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('destination', type=Path)
     parser.add_argument('--split', choices=['development', 'verification'],
@@ -114,9 +114,13 @@ if __name__ == '__main__':
     parser.add_argument('--attempts', type=int, default=3)
     parser.add_argument('--cases', default=None,
                         help='comma-separated case ids, e.g. H-01,H-08')
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     config = json.loads(args.config.read_text()) if args.config else {}
     only = set(args.cases.split(',')) if args.cases else None
     report = run(args.destination, args.split,
                  build_adapter(args.adapter, config), args.attempts, only)
     print(json.dumps(report, indent=2, ensure_ascii=False))
+
+
+if __name__ == '__main__':
+    main()

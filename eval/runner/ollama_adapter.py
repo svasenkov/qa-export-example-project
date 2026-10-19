@@ -106,18 +106,24 @@ class OllamaToolAdapter(ModelAdapter):
 
     def _exec_tool(self, name: str, args: dict, workdir: Path):
         if name == 'run_shell':
+            command = args.get('command', '')
+            if not command:
+                return {'kind': 'shell', 'error': 'missing command'}, \
+                    'error: missing command'
             try:
-                proc = subprocess.run(args['command'], shell=True, cwd=workdir,
+                proc = subprocess.run(command, shell=True, cwd=workdir,
                                       capture_output=True, text=True,
                                       timeout=self.command_timeout)
                 out = (proc.stdout + proc.stderr)[:8000]
-                return {'kind': 'shell', 'command': args['command'],
+                return {'kind': 'shell', 'command': command,
                         'exit': proc.returncode, 'stdout': proc.stdout[:8000],
                         'stderr': proc.stderr[:8000]}, f'exit={proc.returncode}\n{out}'
             except subprocess.TimeoutExpired:
-                return {'kind': 'shell', 'command': args['command'], 'exit': -1,
+                return {'kind': 'shell', 'command': command, 'exit': -1,
                         'stdout': '', 'stderr': 'timeout'}, 'timeout'
         if name == 'write_file':
+            if not args.get('path') or 'content' not in args:
+                return {'kind': 'write', 'error': 'missing args'}, 'error: missing args'
             target = (workdir / args['path']).resolve()
             if not str(target).startswith(str(workdir.resolve())):
                 return {'kind': 'write', 'path': args['path'], 'error': 'outside workdir'}, \
@@ -126,6 +132,8 @@ class OllamaToolAdapter(ModelAdapter):
             target.write_text(args['content'])
             return {'kind': 'write', 'path': args['path']}, 'ok'
         if name == 'read_file':
+            if not args.get('path'):
+                return {'kind': 'read', 'error': 'missing path'}, 'error: missing path'
             target = (workdir / args['path']).resolve()
             try:
                 text = target.read_text()[:16000]
@@ -168,8 +176,8 @@ class OllamaToolAdapter(ModelAdapter):
                                    commands=commands, response_text=response)
                 event, result_text = self._exec_tool(name, args, workdir)
                 transcript.append(event)
-                if name == 'run_shell':
-                    commands.append(args['command'])
+                if event.get('command'):
+                    commands.append(event['command'])
                 messages.append({'role': 'tool', 'name': name,
                                  'content': result_text})
         return Attempt(status='finished', transcript=transcript,
