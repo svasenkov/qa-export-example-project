@@ -25,38 +25,51 @@ runtime, Sonar server gate, GitHub workflow и human review остаются б�
 - Vitest: provider 4.1.10, полный `src` плюс собственный vendor overlay,
   LCOV/JSON; удалены исключения main/styles и исключение i18n из duplication.
 - JaCoCo 0.8.14: вместо трёх классов весь вспомогательный Java-код, независимо
-  от фильтра тегов; агент включён также для API/UI/E2E. Union-сборка объединяет
-  exec-файлы всех вариантных форков (`ci`, `mock`, `attach`, `quiet`, `keep`,
-  `skipopen`, `harvideo`, `infra`).
+  от фильтра тегов; агент включён также для API/UI/E2E. Union-сборка
+  воспроизводится одной документированной командой —
+  [scripts/jacoco-union.sh](../../tests/java/tests-java-junit5-rest_assured-selenide/scripts/jacoco-union.sh):
+  девять вариантных форков (`ci`, `mock`, `attach`, `quiet`, `keep`, `skipopen`,
+  `harvideo`, `conlog-off`, `report-off`), каждый со своим exec и результатом,
+  затем общий `jacocoTestCoverageVerification`.
 - Проверка coverage отклоняет неполные/повреждённые/старые отчёты и изменение
   исходников, сверяет LCOV с JSON. Повторяющиеся Go-блоки объединяются, не суммируются.
 - Git hook теперь отклоняет и ошибку самого `git grep`, а не только найденный секрет.
-- CI разделяет продукт, infrastructure, evaluator controls и model behavior;
-  `reference-ready` не принимает skipped/failed/blocked за success.
+- CI — классический: `checks` (OpenSpec, compose-конфиг, тесты repo-инструментов
+  и evaluator controls), модульные тесты, стендовые прогоны, `sonar-gate`.
+  Гейт мержа — required checks на все джобы в branch protection.
 
 ## Доказательства и версии
 
-Свежие результаты: [artifacts/reference-2026-10-19](../../artifacts/reference-2026-10-19/)
-(`go/`, `frontend/`, `java/`, `eval/`). Предыдущие снимки 18.10 сохранены в
+Свежие результаты независимой проверки:
+[artifacts/reference-2026-10-19-review](../../artifacts/reference-2026-10-19-review/)
+(`go/`, `frontend/`, `java/`, `baseline/`): воспроизведение на отдельном
+compose-проекте `qa-review-1019` с уникальными портами (gateway 19821, backend
+18831, frontend 19813, mock 19911) и отдельным PostgreSQL-кластером (порт 55441).
+Прогоны предыдущего исполнителя: [artifacts/reference-2026-10-19](../../artifacts/reference-2026-10-19/)
+(`go/`, `frontend/`, `java/`, `eval/`). Снимки 18.10 сохранены в
 `reference-2026-10-18*` и не редактировались. Накопленный Allure не считается
 результатом одной попытки; точные результаты берутся из JSONL/JUnit XML.
 Java-евиденс: `gate.json` (все 4 метрики 100%, свежесть и source-digest
-проверены), `jacocoTestReport.xml`, `jacoco-html/`, `union-exec/` (8 exec с
-sha256 в `run-summary.json`), `junit/` (39 классов).
+проверены), `jacocoTestReport.xml`, `union/` (9 exec свежих вариантных
+прогонов), `test-results-ci/` (39 классов, 213 тестов).
 
 Условия: macOS arm64, Go 1.27.0, Node 26.10.0 (из локального nvm), Vitest/V8 4.1.10,
 Java Corretto 21.0.9, Gradle wrapper 9.6.0, JaCoCo 0.8.14, Coverage.py 7.15.0.
 PostgreSQL integration выполнялась на временном кластере (порт 55438/55439,
-изолированная БД `qa_scratch_1019`); probe-аккаунты после диагностики удалены.
+изолированная БД `qa_scratch_1019`) и повторно на кластере ревью
+(порт 55441, `qa_review_scratch`); probe-аккаунты после диагностики удалены.
 Java UI/E2E выполнялись против локального Compose: `stand-gateway-ci` (9821),
-`backend-go-stdlib` (8831), `frontend-typescript-vue`, `api-mock` WireMock (9911).
+`backend-go-stdlib` (8831), `frontend-typescript-vue`, `api-mock` WireMock (9911)
+— и повторно против изолированного проекта `qa-review-1019`: gateway 19821,
+backend 18831, frontend 19813, mock 19911.
 Образы пересобраны из этого checkout; идентичность проверена по JWT alg HS256 и
 AUTH-003 поведению (точный пароль 200 / изменённый суффикс 401).
 
 Осторожно: тот же compose project name (`autotests-ai-multistack-app`) используется
 основным checkout'ом и его watchdog (`zero-design-system` `scripts/stands`);
-чужой `compose up` перемонтирует наши контейнеры образами другого стека.
-Перед evidence-прогоном идентичность gateway/backend проверялась заново.
+чужой `compose up` перемонтирует контейнеры образами другого стека.
+Поэтому свежие прогоны выполнены только на отдельном project/портах/образах;
+общий стенд как доказательство не используется.
 
 Команды из модулей:
 
@@ -100,10 +113,11 @@ Compose-стенде (go-stdlib + vue через `deploy/ci/nginx.conf`) — з�
 [JUnit XML](../../artifacts/reference-2026-10-19/java/junit/).
 
 Screenshot-tag на macOS остаётся исключённым: golden-файлы рассчитаны на
-CI-окружение с закреплённым Chrome 148, локальный cache содержит Chrome 150 —
-pixel-расхождения являются известным env-ограничением, а не успешным доказательством
-и не регрессией. Прогон screenshot-набора на совместимом браузере — отдельная
-задача (см. tasks.md).
+CI-окружение. Локальный cache `~/.local/share/chrome-for-testing` содержит
+именно закреплённый mac_arm-148.0.7778.178 — его и использовали свежие
+UI/E2E-прогоны (pin подтверждён фактическим запуском); системный Chrome 155
+в прогонах не участвовал. Прогон screenshot-набора на совместимом окружении —
+отдельная задача (см. tasks.md).
 
 Неопределённый объём остаётся: header, navigation, layout, каталог (помимо
 HTTP-схемы items), PWA, доступность — требования к согласованным состояниям,
@@ -125,13 +139,16 @@ HTTP-схемы items), PWA, доступность — требования к 
 - I-07 Отчётность → Allure helpers покрыты harness-тестами; Node coverage
   по-прежнему отражает только загруженные файлы.
 - I-08 CI → YAML разобран, shell синтаксис проверен; GitHub workflow **NOT RUN**.
-- I-09 Sonar → локальные properties и разрешительный preflight подготовлены;
-  анализ, imported metrics, overall gate и final server status **BLOCKED**.
+- I-09 Sonar → `https://sonar.qa.guru` (авторизованный сервер): все три модуля
+  проанализированы, imported coverage=100% overall, server Quality Gate **OK**
+  для каждого projectKey. Найденные дефекты исправлены до повторной выгрузки:
+  SRI для swagger-ui CDN в openapi-docs.html, CPD-исключение i18n-словарей,
+  три reliability-находки в Java support (regex DoS-паттерны и record с byte[]).
 - I-10 Переносимость новой генерации → **NOT RUN**; шаблон не передаёт ей свой статус.
 
 Java infrastructure slice (`infraCoverageSlice`: весь support-код `src/test/java`,
 исключены тела проверок `tests/{api,ui,e2e,infra,manual}`) — по union exec из
-восьми форков:
+девяти вариантных форков (см. `scripts/jacoco-union.sh`):
 
 - **lines 1237/1237, branches 502/502, instructions 5639/5639, methods 269/269**
 - `jacocoTestCoverageVerification` — PASS, минимум 1.0 по каждой метрике;
@@ -144,9 +161,11 @@ fake W3C hub, shadow classloader) и вариантными прогонами �
 тестируемым швам (перегрузки с `TestConfig`/env-getter, public ctor фейков для
 `Augmenter`, `Objects.requireNonNullElse` вместо недостижимой null-ветки).
 
-Python infrastructure: `tools/quality/coverage.py` — 14 unittest PASS
-(152/152 statements, 84/84 branches по предыдущему измерению собственного кода);
-`eval/` controls — 4 unittest PASS; `prepare.py` — 40/40 statements, 8/8 branches.
+Python infrastructure: `tools/quality/coverage.py` — 17 unittest PASS
+(197/197 statements, 106/106 branches по свежему измерению собственного кода);
+manifest теперь связывает результат не только с исходниками, но и с инвентарём
+тестов, конфигурацией/lockfiles и параметрами runtime. `eval/` controls —
+4 unittest PASS; `prepare.py` — 40/40 statements, 8/8 branches.
 Shell-скрипты инвентаризованы: `ensure-databases.sh` исполняется живым compose,
 `install-chrome-for-testing.sh` покрыт pin-путём `LocalChromePin`, `sonar.sh` —
 тонкая обёртка с разрешительным preflight. Метрики разных языков не усредняются.
@@ -172,19 +191,30 @@ Shell-скрипты инвентаризованы: `ensure-databases.sh` ис�
 `sonar.qualitygate.wait=true` установлен в существующих контурах. Убрана отправка
 Java по URL по умолчанию. `tools/quality/sonar.sh` сначала требует точное разрешение,
 проверяет fresh/full coverage, затем вызывает установленный CLI и ждёт gate.
-Нужны отдельно выбранная закреплённая версия scanner, разрешённый сервер и токен.
-Java остаётся на существующем Gradle Sonar plugin 7.5.0.8588.
+Закреплённый CLI — SonarScanner 8.1.0.6389 (`~/.local/share/sonar-scanner/`,
+в CI скачивается из binaries.sonarsource.com). Java — Gradle Sonar plugin 7.5.0.8588.
+Токен хранится в `~/.config/sonar/sonar.qa.guru.token` (chmod 600, вне репозитория);
+окружение поднимается через `. tools/quality/sonar-env.sh`; в CI — GitHub secret
+`SONAR_TOKEN`. Конвенция для учащегося задокументирована в
+[tools/quality README](../../tools/quality/README.md) и `.env.diploma.example`.
 
-Ни analysis ID, ни финального Quality Gate нет. Серверный overall gate и импорт
-LCOV/Go/JaCoCo не проверены. Sonar CI job сейчас явный блокер, а не реализованный
-scanner pipeline. Harness behavior job также блокируется без model adapter.
-Оба участвуют в reference-ready вместе с остальными gates.
+Проведены реальные анализы на `https://sonar.qa.guru` (evidence:
+`artifacts/reference-2026-10-19-review/sonar/` — report-task.txt, gate JSON):
+все три projectKey имеют server Quality Gate **OK** при overall coverage=100%.
+CI job `sonar-gate` реализован как настоящий pipeline: скачивает coverage-артефакты,
+поднимает compose-стенд, прогоняет union JaCoCo с gate, затем три анализа с
+ожиданием серверного gate. Фактический прогон на GitHub не выполнялся — workflow
+без push не запускается. Поведенческий gate агента отложен до изолированного
+model runner и исключён из CI — статус фиксируется в [eval/README.md](../../eval/README.md),
+а не красной заглушкой в workflow.
 
 Docker-упаковка локально подтверждена частично: образы `backend-go-stdlib` и
 `frontend-typescript-vue` собраны из этого checkout и обслуживают зелёные
-API/UI/E2E прогоны через gateway. Полный `docker compose up` с нуля, prod-режимы
-и GitHub workflow ещё не проверены. Локальный browser cache имеет Chrome 150,
-проект закрепляет 148.0.7778.178; screenshot-tag исключён, pin не подменялся.
+API/UI/E2E прогоны через gateway — в том числе на изолированном проекте
+`qa-review-1019` с уникальными портами. Полный `docker compose up` с нуля,
+prod-режимы и GitHub workflow ещё не проверены. Проект закрепляет
+148.0.7778.178, локальный cache содержит именно его; системный Chrome 155
+не использовался; screenshot-tag исключён, pin не подменялся.
 Ручных проверок человеком нет.
 
 ## Распределение ответственности и контракт генератора
@@ -203,9 +233,12 @@ README и измеритель своего языка; общие механи�
 До собственного успешного прогона новая генерация не получает статус соответствия.
 
 Остаток конкретен: согласование полного product scope (header/navigation/layout/
-catalog/PWA), связь manifests с tests/config/runtime, screenshot-tag на
-закреплённом браузере, полный Compose/CI прогон в GitHub, разрешённый Sonar с
-final server gate, независимый model runtime для H-01–H-11 и human review.
+catalog/PWA), прогон screenshot-набора на окружении, совместимом с закреплённым
+браузером и golden-файлами, полный Compose/CI прогон в GitHub (включая новый
+реальный sonar-gate job), независимый model runtime для H-01–H-11 и human review.
+Связь manifests с tests/config/runtime реализована в `tools/quality` и проверена
+на свежих прогонах go/frontend/jacoco. Sonar разблокирован: три модуля имеют
+server Quality Gate OK на sonar.qa.guru.
 
 Официальные основания параметров: [Vitest coverage](https://vitest.dev/guide/coverage.html),
 [Gradle JaCoCo](https://docs.gradle.org/current/userguide/jacoco_plugin.html),
