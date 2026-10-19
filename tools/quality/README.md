@@ -61,8 +61,22 @@ https://sonar.qa.guru → My Account → Security → Generate Token и сохр
 `sonar-env.sh` задаёт `SONAR_HOST_URL`, `SONAR_APPROVED_URL` и `SONAR_TOKEN`
 из файла `${SONAR_TOKEN_FILE:-~/.config/sonar/sonar.qa.guru.token}`.
 В репозиторий токен не кладётся: ни в `.env`, ни в конфиги — `.env*` gitignored,
-но user-level файл надёжнее и не может быть случайно закоммичен. В CI токен берётся
-из GitHub secret `SONAR_TOKEN` (устанавливается `gh secret set SONAR_TOKEN`).
+но user-level файл надёжнее и не может быть случайно закоммичен.
+
+В CI используется **отдельный токен** типа Global Analysis Token — он умеет
+только загружать анализы и читать Quality Gate, без доступа к аккаунту.
+Создаётся через API от локального токена, значение не печатается:
+
+```bash
+curl -fsS -u "$(cat ~/.config/sonar/sonar.qa.guru.token):" -X POST \
+  "$SONAR_HOST_URL/api/user_tokens/generate" \
+  --data-urlencode "name=github-actions-<repo>" \
+  --data-urlencode "type=GLOBAL_ANALYSIS_TOKEN"
+# поле "token" из ответа → gh secret set SONAR_TOKEN
+```
+
+Секрет обновляется `gh secret set SONAR_TOKEN`; локальный токен при этом не
+затрагивается и отзывается независимо.
 
 Существующие настройки Sonar вызываются для Go/Vue через:
 
