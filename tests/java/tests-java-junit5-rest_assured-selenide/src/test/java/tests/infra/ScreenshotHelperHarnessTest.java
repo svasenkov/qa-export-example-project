@@ -257,6 +257,9 @@ class ScreenshotHelperHarnessTest extends AllureMeta {
 
         var messy = config(Map.of("screenshotsDir", "shots\\nested//"));
         assertEquals("shots/nested", ScreenshotHelper.screenshotsDir(messy));
+
+        var slashesOnly = config(Map.of("screenshotsDir", "///"));
+        assertEquals("", ScreenshotHelper.screenshotsDir(slashesOnly));
     }
 
     @Test

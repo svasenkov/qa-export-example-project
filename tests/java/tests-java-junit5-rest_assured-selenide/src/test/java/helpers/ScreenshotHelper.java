@@ -73,16 +73,16 @@ public final class ScreenshotHelper {
             var expected = readExpectedScreenshot(area, viewport);
             var comparison = compareImages(expected, actual, label, config);
             step("Compare screenshot: " + attachmentName, () -> {
-                if (comparison.passed()) {
+                if (comparison.passed) {
                     attachPng(attachmentName, actual);
                     return;
                 }
 
                 attachPng(attachmentName + "-expected", expected);
                 attachPng(attachmentName + "-actual", actual);
-                attachPng(attachmentName + "-diff", comparison.diffPng());
-                saveFailArtifacts(label, actual, comparison.diffPng());
-                throw new AssertionError(comparison.message());
+                attachPng(attachmentName + "-diff", comparison.diffPng);
+                saveFailArtifacts(label, actual, comparison.diffPng);
+                throw new AssertionError(comparison.message);
             });
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -120,7 +120,12 @@ public final class ScreenshotHelper {
         if (dir.isEmpty()) {
             throw new IllegalStateException("screenshotsDir must not be empty");
         }
-        return dir.replace('\\', '/').replaceAll("/+$", "");
+        var normalized = dir.replace('\\', '/');
+        var end = normalized.length();
+        while (end > 0 && normalized.charAt(end - 1) == '/') {
+            end--;
+        }
+        return normalized.substring(0, end);
     }
 
     public static String screenshotMode() {
@@ -251,8 +256,17 @@ public final class ScreenshotHelper {
         }
     }
 
-    /** Internal value carrier — never compared or printed, so record array semantics are fine. */
-    private record ImageComparison(boolean passed, byte[] diffPng, String message) {
+    /** Internal value carrier — never compared, so field access is intentional. */
+    private static final class ImageComparison {
+        private final boolean passed;
+        private final byte[] diffPng;
+        private final String message;
+
+        private ImageComparison(boolean passed, byte[] diffPng, String message) {
+            this.passed = passed;
+            this.diffPng = diffPng;
+            this.message = message;
+        }
     }
 
     private static ImageComparison compareImages(

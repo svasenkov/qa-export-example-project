@@ -80,14 +80,35 @@ Sonar-панель появляется только при явном `SONAR_QU
 
 ## Полная область JaCoCo
 
+Полный gate объединяет exec-файлы нескольких конфигурационных вариантов:
+часть ветвей `TestBase` и браузерных помощников достижима только при
+определённых флагах (attachments, lifecycle браузера, HAR/video, режим Allure).
+Воспроизводимая команда — [scripts/jacoco-union.sh](scripts/jacoco-union.sh):
+
 ```bash
-./gradlew test jacocoTestReport jacocoTestCoverageVerification --rerun-tasks -Denv=ci -DincludeTags=infra
+# live-стенд по config/ci.properties, mock-стенд по config/mock.properties
+bash scripts/jacoco-union.sh
+
+# изолированный стенд без правки config-файлов
+CI_BASE_URL=http://localhost:19821 CI_API_URL=http://localhost:18831/ \
+MOCK_BASE_URL=http://localhost:19911 MOCK_API_URL=http://localhost:19911/ \
+  bash scripts/jacoco-union.sh
 ```
+
+Скрипт прогоняет варианты `ci`, `mock`, `attach`, `quiet`, `keep`, `skipopen`,
+`harvideo`, `conlog-off`, `report-off`, кладёт exec каждого варианта в
+`build/jacoco/union/` и в конце выполняет `jacocoTestReport` +
+`jacocoTestCoverageVerification`. Одиночный вариант полный gate не проходит —
+это ожидаемое поведение, а не регрессия.
 
 Область — все вспомогательные классы автоматизации, включая API client, Page Object,
 listeners и fixtures; исключены тела проверок в `tests/{api,ui,e2e,infra,manual}`.
 Пороги lines/branches/instructions/methods = 100. Фильтр тестов больше не сужает
 область измерения. Один infra-запуск не покрывает браузерные утилиты: gate честно падает.
-Это не покрытие Go/Vue. Перед повтором сохраните `build/test-results` и `build/reports`.
-Sonar не имеет сервера по умолчанию; отдельный запуск требует точного разрешённого
-`SONAR_HOST_URL`, совпадающего `SONAR_APPROVED_URL`, и токена через окружение.
+Это не покрытие Go/Vue. Перед повтором сохраните `build/test-results`, `build/reports`
+и `build/jacoco/union` в новый каталог попытки — union собирается только из свежих
+exec, старые файлы не подмешиваются.
+Sonar-анализ идёт на `https://sonar.qa.guru` после union-сборки покрытия:
+`. tools/quality/sonar-env.sh` (токен из `~/.config/sonar/sonar.qa.guru.token`),
+затем `./gradlew sonar`. Задача ждёт серверный Quality Gate и падает на FAILED.
+Порядок и конвенция хранения токена — в [tools/quality README](../../../tools/quality/README.md).

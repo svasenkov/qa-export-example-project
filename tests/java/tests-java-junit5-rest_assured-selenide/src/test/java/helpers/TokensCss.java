@@ -17,7 +17,7 @@ public final class TokensCss {
     private static final Pattern ROOT_BLOCK =
             Pattern.compile(":root\\s*\\{([^}]+)\\}", Pattern.DOTALL);
     private static final Pattern TOKEN =
-            Pattern.compile("(--[\\w-]+)\\s*:\\s*([^;]+);");
+            Pattern.compile("(--[\\w-]++)\\s*+:\\s*+([^;]++);");
 
     private TokensCss() {
     }

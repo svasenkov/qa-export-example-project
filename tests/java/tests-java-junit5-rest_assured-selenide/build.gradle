@@ -358,15 +358,14 @@ tasks.named('jacocoTestCoverageVerification', JacocoCoverageVerification).config
 }
 
 // A saved URL is not permission to transmit this checkout.
+def jacocoXmlFile = layout.buildDirectory.file('reports/jacoco/test/jacocoTestReport.xml').get().asFile
 tasks.named('sonar').configure {
-    dependsOn tasks.named('jacocoTestCoverageVerification')
     doFirst {
         if (!System.getenv('SONAR_HOST_URL') ||
             System.getenv('SONAR_APPROVED_URL') != System.getenv('SONAR_HOST_URL')) {
             throw new GradleException('BLOCKED: explicitly approve this Sonar URL with SONAR_APPROVED_URL')
         }
-        def xml = layout.buildDirectory.file('reports/jacoco/test/jacocoTestReport.xml').get().asFile
-        if (!xml.isFile() || xml.length() == 0) {
+        if (!jacocoXmlFile.isFile() || jacocoXmlFile.length() == 0) {
             throw new GradleException('Missing JaCoCo report')
         }
     }
