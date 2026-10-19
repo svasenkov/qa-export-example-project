@@ -21,8 +21,13 @@ python3 -m unittest discover -s tools/quality -v
 структура отчёта, наличие всех файлов, непустые счётчики и 100% каждого вида.
 LCOV frontend сверяется с JSON summary; repeated Go blocks объединяются по местоположению.
 Непопадание type-only файла в provider report требует явного разбора, не auto-pass.
-Файлы тестов/config пока не связаны с manifest: этот дополнительный контроль
-нужен до сертификации переносимых артефактов; в CI используются отчёты того же job.
+Manifest связывает результат также с тестовыми исходниками, конфигурацией/lockfiles
+и фактом выставленных env-флагов (`TEST_DATABASE_URL` для go): изменение любого
+из них между `begin` и `check` отклоняет доказательство. Запускайте `begin`
+под тем же окружением, что и команду тестов; существенные параметры прогона
+записывайте через `--runtime KEY=VALUE`. Для `jacoco` проверяются также exec-файлы:
+`build/jacoco/test.exec` и каждый `build/jacoco/union/*.exec` должны быть созданы
+после `begin` — старый union-exec не подмешивается незаметно.
 
 Области следуют модулям профиля. В другой генерации пути передаются из её профиля,
 не копируются из этой сборки; неподдерживаемый kind завершается ошибкой.
@@ -37,13 +42,51 @@ server status. Проверить, что серверный gate содержи
 а не только new code. До получения этого результата Sonar = blocked/not_run.
 Сохранённый URL и наличие токена сами по себе не разрешают отправку исходников.
 
+## Подключённый сервер: sonar.qa.guru
+
+Авторизованный сервер проекта — `https://sonar.qa.guru` (SonarQube Community Build).
+Три projectKey уже provisioned и совпадают с `sonar.projectKey` в модулях
+(`autotests-ai-multistack-app-{backend-go-stdlib,frontend-typescript-vue,
+tests-java-junit5-rest_assured-selenide}`).
+
+**Токен — рекомендуемое хранилище.** Учащийся создаёт токен на
+https://sonar.qa.guru → My Account → Security → Generate Token и сохраняет его
+в файл `~/.config/sonar/sonar.qa.guru.token` с правами `chmod 600`. Файл живёт
+вне репозитория и переживает чистые checkout. Затем:
+
+```bash
+. tools/quality/sonar-env.sh   # экспортирует SONAR_* из token-файла, значение не печатается
+```
+
+`sonar-env.sh` задаёт `SONAR_HOST_URL`, `SONAR_APPROVED_URL` и `SONAR_TOKEN`
+из файла `${SONAR_TOKEN_FILE:-~/.config/sonar/sonar.qa.guru.token}`.
+В репозиторий токен не кладётся: ни в `.env`, ни в конфиги — `.env*` gitignored,
+но user-level файл надёжнее и не может быть случайно закоммичен. В CI токен берётся
+из GitHub secret `SONAR_TOKEN` (устанавливается `gh secret set SONAR_TOKEN`).
+
 Существующие настройки Sonar вызываются для Go/Vue через:
 
 ```bash
+. tools/quality/sonar-env.sh
 sh tools/quality/sonar.sh frontend frontend/typescript/frontend-typescript-vue artifacts/run-001/frontend.json artifacts/run-001/coverage/coverage-summary.json
 ```
 
 Без явно разрешённых совпадающих SONAR_HOST_URL/SONAR_APPROVED_URL команда
 завершается BLOCKED до обращения к серверу. Требуется установленный закреплённый
-CLI, его версию скрипт выводит перед анализом. Путь импортируемого coverage передаётся
-из проверенного артефакта, а не берётся от старого файла по умолчанию.
+CLI (`sonar-scanner` 8.1.0.6389 в `~/.local/share/sonar-scanner/`, в CI job
+скачивается из binaries.sonarsource.com), его версию скрипт выводит перед анализом.
+Путь импортируемого coverage передаётся из проверенного артефакта, а не берётся
+от старого файла по умолчанию.
+
+Java-модуль анализируется штатным Gradle-плагином после union-сборки покрытия:
+
+```bash
+. tools/quality/sonar-env.sh
+(cd tests/java/tests-java-junit5-rest_assured-selenide && bash scripts/jacoco-union.sh)
+(cd tests/java/tests-java-junit5-rest_assured-selenide && ./gradlew sonar)
+```
+
+`sonar` требует наличия свежего `jacocoTestReport.xml` (guard в `build.gradle`)
+и совпадения SONAR_APPROVED_URL с SONAR_HOST_URL; сами тесты он не перезапускает.
+`sonar.qualitygate.wait=true` останавливает задачу на серверном Quality Gate:
+FAILED = ненулевой exit code.

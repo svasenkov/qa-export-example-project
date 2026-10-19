@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+import unittest.mock
 
 spec = importlib.util.spec_from_file_location('gate', Path(__file__).with_name('coverage.py'))
 gate = importlib.util.module_from_spec(spec)
@@ -17,6 +18,7 @@ class CoverageEvidenceTests(unittest.TestCase):
         self.root = Path(self.tmp.name)
         (self.root / 'go.mod').write_text('module example\n')
         (self.root / 'main.go').write_text('package main\nfunc main() {}\n')
+        (self.root / 'main_test.go').write_text('package main\n')
         self.manifest = self.root / 'run.json'
         gate.begin(self.root, 'go', self.manifest)
         self.report = self.root / 'coverage.out'
@@ -64,6 +66,64 @@ class CoverageEvidenceTests(unittest.TestCase):
     def test_cannot_overwrite_previous_attempt(self):
         with self.assertRaises(FileExistsError): gate.begin(self.root, 'go', self.manifest)
 
+    def test_manifest_binds_tests_config_and_runtime_env(self):
+        self.report.write_text('mode: set\nexample/main.go:2.1,2.15 1 1\n')
+        self.assertEqual(self.check()['status'], 'pass')
+        for name, path in [('test', self.root / 'main_test.go'), ('config', self.root / 'go.mod')]:
+            original = path.read_text()
+            path.write_text(original + '\n')
+            with self.subTest(changed=name), self.assertRaisesRegex(gate.EvidenceError, 'changed'):
+                self.check()
+            path.write_text(original)
+        with unittest.mock.patch.dict(os.environ, {'TEST_DATABASE_URL': 'postgres://x'}):
+            with self.assertRaisesRegex(gate.EvidenceError, 'environment'):
+                self.check()
+
+    def test_jacoco_stale_or_missing_exec_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / 'src/test/java/helpers').mkdir(parents=True)
+            (root / 'src/test/java/helpers/Helper.java').write_text('class Helper {}')
+            (root / 'src/test/java/tests/api').mkdir(parents=True)
+            (root / 'src/test/java/tests/api/A.java').write_text('class A {}')
+            (root / 'src/test/resources').mkdir(parents=True)
+            (root / 'build.gradle').write_text('// build')
+            manifest, report = root / 'run.json', root / 'jacoco.xml'
+            gate.begin(root, 'jacoco', manifest)
+            counters = ''.join(f'<counter type="{m}" covered="1" missed="0"/>' for m in ('LINE', 'BRANCH', 'INSTRUCTION', 'METHOD'))
+            report.write_text('<report><package name="helpers"><sourcefile name="Helper.java"/></package><package name="tests/api"><sourcefile name="A.java"/></package>' + counters + '</report>')
+            with self.assertRaisesRegex(gate.EvidenceError, 'No JaCoCo exec'):
+                gate.check(root, 'jacoco', manifest, report)
+            union = root / 'build/jacoco/union'
+            union.mkdir(parents=True)
+            (root / 'build/jacoco/test.exec').write_bytes(b'fresh')
+            (union / 'stale.exec').write_bytes(b'old')
+            os.utime(union / 'stale.exec', (1, 1))
+            with self.assertRaisesRegex(gate.EvidenceError, 'Stale'):
+                gate.check(root, 'jacoco', manifest, report)
+            os.utime(union / 'stale.exec', None)
+            result = gate.check(root, 'jacoco', manifest, report)
+            self.assertEqual(sorted(result['exec_files']), ['stale.exec', 'test.exec'])
+
+    def test_inputs_reject_unknown_domain_and_empty_inventories(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            with self.assertRaises(gate.EvidenceError):
+                gate.inputs(root, 'unknown')
+            (root / 'go.mod').write_text('module example')
+            with self.assertRaisesRegex(gate.EvidenceError, 'test inventory'):
+                gate.inputs(root, 'go')
+            (root / 'main_test.go').write_text('package main')
+            (root / 'go.mod').unlink()
+            with self.assertRaisesRegex(gate.EvidenceError, 'config inventory'):
+                gate.inputs(root, 'go')
+            (root / 'go.mod').write_text('module example')
+            (root / 'main.go').write_text('package main\nfunc main() {}\n')
+            manifest = root / 'run.json'
+            gate.begin(root, 'go', manifest, {'env': 'ci'})
+            recorded = json.loads(manifest.read_text())
+            self.assertEqual(recorded['inputs']['runtime']['params'], {'env': 'ci'})
+
 
 class OtherProviderEvidenceTests(unittest.TestCase):
     def test_frontend_lcov_must_match_summary_and_cannot_be_missing(self):
@@ -71,6 +131,9 @@ class OtherProviderEvidenceTests(unittest.TestCase):
             root = Path(temp)
             (root / 'src').mkdir()
             (root / 'src/main.ts').write_text('console.log(1)')
+            (root / 'src/test').mkdir()
+            (root / 'src/test/main.test.ts').write_text('it("x", () => {})')
+            (root / 'package.json').write_text('{}')
             manifest, report = root / 'run.json', root / 'coverage-summary.json'
             gate.begin(root, 'frontend', manifest)
             row = {metric: {'total': 1, 'covered': 1} for metric in ('lines','statements','functions','branches')}
@@ -90,9 +153,16 @@ class OtherProviderEvidenceTests(unittest.TestCase):
             source = root / 'src/test/java/helpers/Helper.java'
             source.parent.mkdir(parents=True)
             source.write_text('package helpers; class Helper {}')
+            (root / 'src/test/java/tests/api').mkdir(parents=True)
+            (root / 'src/test/java/tests/api/A.java').write_text('class A {}')
+            (root / 'src/test/resources').mkdir(parents=True)
+            (root / 'build.gradle').write_text('// build')
             manifest, report = root/'run.json', root/'jacoco.xml'
             gate.begin(root,'jacoco',manifest)
-            report.write_text('<report><package name="helpers"><sourcefile name="Helper.java"/></package><counter type="LINE" covered="1" missed="0"/><counter type="BRANCH" covered="1" missed="0"/><counter type="INSTRUCTION" covered="1" missed="0"/><counter type="METHOD" covered="1" missed="0"/></report>')
+            union = root / 'build/jacoco'
+            union.mkdir(parents=True)
+            (union / 'test.exec').write_bytes(b'run')
+            report.write_text('<report><package name="helpers"><sourcefile name="Helper.java"/></package><package name="tests/api"><sourcefile name="A.java"/></package><counter type="LINE" covered="1" missed="0"/><counter type="BRANCH" covered="1" missed="0"/><counter type="INSTRUCTION" covered="1" missed="0"/><counter type="METHOD" covered="1" missed="0"/></report>')
             self.assertEqual(gate.check(root,'jacoco',manifest,report)['status'],'pass')
             report.write_text(report.read_text().replace('missed="0"','missed="1"'))
             self.assertEqual(gate.check(root,'jacoco',manifest,report)['status'],'fail')
@@ -150,6 +220,7 @@ class CorruptEvidenceControls(unittest.TestCase):
             root=Path(temp);manifest=root/'manifest.json';report=root/'coverage.out'
             (root/'go.mod').write_text('module example')
             (root/'main.go').write_text('package main; func main() {}')
+            (root/'main_test.go').write_text('package main')
             script=str(Path(__file__).with_name('coverage.py'))
             def call(action, expected):
                 args=[script,action,'go',str(root),str(manifest),'--report',str(report)]

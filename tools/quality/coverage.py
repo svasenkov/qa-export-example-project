@@ -2,7 +2,9 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
+import sys
 import time
 import xml.etree.ElementTree as ET
 
@@ -32,10 +34,50 @@ def sources(root, kind):
     return {p.relative_to(root).as_posix(): digest(p) for p in sorted(files)}
 
 
-def begin(root, kind, path):
+def inputs(root, kind):
+    """Digests of the test sources, run configuration and runtime parameters a
+    report must stay bound to: editing them invalidates the manifest."""
+    if kind == 'go':
+        tests = [p for p in root.rglob('*_test.go') if p.is_file()]
+        config = [p for name in ('go.mod', 'go.sum') if (p := root / name).is_file()]
+        env = ['TEST_DATABASE_URL']
+    elif kind == 'frontend':
+        test_dir = root / 'src/test'
+        tests = [p for p in test_dir.rglob('*') if p.is_file()] if test_dir.is_dir() else []
+        config = [p for name in ('package.json', 'package-lock.json', 'vitest.config.ts',
+                                 'vite.config.ts', 'tsconfig.json', 'index.html', '.nvmrc')
+                  if (p := root / name).is_file()]
+        env = []
+    elif kind == 'jacoco':
+        base = root / 'src/test'
+        tests = ([p for p in (base / 'java/tests').rglob('*.java')] +
+                 [p for p in (base / 'resources').rglob('*') if p.is_file()])
+        config = [p for name in ('build.gradle', 'settings.gradle', 'gradle.properties')
+                  if (p := root / name).is_file()]
+        config += [p for p in (root / 'gradle/wrapper').glob('*') if p.is_file()]
+        env = []
+    else:
+        raise EvidenceError('Unknown measurement domain')
+    if not tests:
+        raise EvidenceError('Empty test inventory')
+    if not config:
+        raise EvidenceError('Empty config inventory')
+    return {
+        'tests': {p.relative_to(root).as_posix(): digest(p) for p in sorted(tests)},
+        'config': {p.relative_to(root).as_posix(): digest(p) for p in sorted(config)},
+        'runtime': {'platform': sys.platform,
+                    'env': {name: name in os.environ for name in env}},
+    }
+
+
+def begin(root, kind, path, params=None):
     # Exclusive creation: a rerun must not overwrite the previous attempt.
+    data = {'kind': kind, 'started_ns': time.time_ns(),
+            'sources': sources(root, kind), 'inputs': inputs(root, kind)}
+    if params:
+        data['inputs']['runtime']['params'] = params
     with path.open('x') as stream:
-        json.dump({'kind': kind, 'started_ns': time.time_ns(), 'sources': sources(root, kind)}, stream, indent=2)
+        json.dump(data, stream, indent=2)
 
 
 def fresh(path, started):
@@ -139,12 +181,33 @@ def validate_lcov(root, report, started, summary):
     return digest(lcov)
 
 
+def check_exec_freshness(root, started):
+    """Every JaCoCo exec merged into the report must come from this attempt;
+    a leftover union file silently mixes in older data."""
+    exec_dir = root / 'build' / 'jacoco'
+    execs = sorted(exec_dir.glob('*.exec')) + sorted(
+        (exec_dir / 'union').glob('*.exec')) if exec_dir.is_dir() else []
+    if not execs:
+        raise EvidenceError('No JaCoCo exec data')
+    for entry in execs:
+        fresh(entry, started)
+    return [e.name for e in execs]
+
+
 def check(root, kind, manifest, report):
     before = json.loads(manifest.read_text())
     current = sources(root, kind)
     if before['kind'] != kind or before['sources'] != current:
         raise EvidenceError('Source scope or contents changed since run start')
+    current_inputs = inputs(root, kind)
+    recorded = before.get('inputs', {})
+    for key in ('tests', 'config'):
+        if recorded.get(key) != current_inputs[key]:
+            raise EvidenceError(f'{key.title()} inputs changed since run start')
+    if recorded.get('runtime', {}).get('env') != current_inputs['runtime']['env']:
+        raise EvidenceError('Runtime environment changed since run start')
     fresh(report, before['started_ns'])
+    exec_files = check_exec_freshness(root, before['started_ns']) if kind == 'jacoco' else []
     covered_files, totals = measure(root, kind, report)
     lcov_hash = validate_lcov(root, report, before['started_ns'], json.loads(report.read_text())) if kind == 'frontend' else None
     # Type-only TS and Java annotation/interface files may have zero executable
@@ -155,6 +218,7 @@ def check(root, kind, manifest, report):
     return {'status': 'pass' if not missing and all(c == t for c, t in totals.values()) else 'fail',
             'kind': kind, 'metrics': totals, 'missing_files': missing,
             'source_digest': hashlib.sha256(json.dumps(current, sort_keys=True).encode()).hexdigest(),
+            'exec_files': exec_files,
             'report_sha256': digest(report), 'lcov_sha256': lcov_hash}
 
 
@@ -165,10 +229,13 @@ def main():
     parser.add_argument('root', type=Path)
     parser.add_argument('manifest', type=Path)
     parser.add_argument('--report', type=Path)
+    parser.add_argument('--runtime', action='append', default=[],
+                        help='Record a runtime parameter as KEY=VALUE at begin (evidence only)')
     args = parser.parse_args()
     try:
         if args.action == 'begin':
-            begin(args.root.resolve(), args.kind, args.manifest)
+            params = dict(pair.split('=', 1) for pair in args.runtime)
+            begin(args.root.resolve(), args.kind, args.manifest, params or None)
             return 0
         result = check(args.root.resolve(), args.kind, args.manifest, args.report)
         print(json.dumps(result, indent=2))
