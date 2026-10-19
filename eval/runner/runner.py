@@ -19,6 +19,7 @@ sys.path.insert(0, str(ROOT / 'eval'))
 
 from prepare import prepare  # noqa: E402
 from runner.adapters import CodexSdkAdapter, RecordingStubAdapter, sha256_tree  # noqa: E402
+from runner.ollama_adapter import OllamaToolAdapter  # noqa: E402
 from runner.oracles import check  # noqa: E402
 
 
@@ -38,10 +39,16 @@ def build_adapter(name: str, config: dict):
         return RecordingStubAdapter(config.get('script'))
     if name == 'codex-sdk':
         return CodexSdkAdapter(model=config.get('model', 'composer-2.5'))
+    if name == 'ollama':
+        return OllamaToolAdapter(
+            model=config.get('model', 'qwen3-coder:30b'),
+            base_url=config.get('base_url', 'http://localhost:11434'),
+            max_steps=config.get('max_steps', 15))
     raise SystemExit(f'unknown adapter: {name}')
 
 
-def run(destination: Path, split: str, adapter, attempts: int = 3) -> dict:
+def run(destination: Path, split: str, adapter, attempts: int = 3,
+        only: set | None = None) -> dict:
     destination.mkdir(parents=True, exist_ok=False)
     instructions = canonical_instructions()
     with tempfile.TemporaryDirectory() as master_dir:
@@ -49,6 +56,8 @@ def run(destination: Path, split: str, adapter, attempts: int = 3) -> dict:
         master = prepare(master_root, split)
         results = []
         for row in master['results']:
+            if only and row['case'] not in only:
+                continue
             case_id = row['case']
             case_src = master_root / case_id
             task = (case_src / 'TASK.md').read_text()
@@ -98,12 +107,16 @@ if __name__ == '__main__':
     parser.add_argument('destination', type=Path)
     parser.add_argument('--split', choices=['development', 'verification'],
                         default='development')
-    parser.add_argument('--adapter', choices=['stub', 'codex-sdk'], required=True)
+    parser.add_argument('--adapter', choices=['stub', 'codex-sdk', 'ollama'],
+                        required=True)
     parser.add_argument('--config', type=Path, default=None,
-                        help='JSON: model, script (stub), budget record')
+                        help='JSON: model, base_url, script (stub), budget record')
     parser.add_argument('--attempts', type=int, default=3)
+    parser.add_argument('--cases', default=None,
+                        help='comma-separated case ids, e.g. H-01,H-08')
     args = parser.parse_args()
     config = json.loads(args.config.read_text()) if args.config else {}
+    only = set(args.cases.split(',')) if args.cases else None
     report = run(args.destination, args.split,
-                 build_adapter(args.adapter, config), args.attempts)
+                 build_adapter(args.adapter, config), args.attempts, only)
     print(json.dumps(report, indent=2, ensure_ascii=False))
