@@ -60,6 +60,9 @@ sonar {
         if (System.getenv('SONAR_HOST_URL')) {
             property 'sonar.host.url', System.getenv('SONAR_HOST_URL')
         }
+        if (System.getenv('SONAR_ORGANIZATION')) {
+            property 'sonar.organization', System.getenv('SONAR_ORGANIZATION')
+        }
         property 'sonar.qualitygate.wait', 'true'
         // Test sources as main — Selenide/helpers live under src/test/java.
         property 'sonar.sources', 'src/test/java'

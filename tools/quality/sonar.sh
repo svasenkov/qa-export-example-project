@@ -22,7 +22,12 @@ fi
 sonar-scanner --version
 absolute_report=$(python3 -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve())' "$report")
 cd "$module"
+# Provider/fork overrides: SONAR_ORGANIZATION is required on sonarcloud.io;
+# SONAR_PROJECT_KEY overrides the module default when the key is taken.
+set -- -Dsonar.qualitygate.wait=true
+[ -n "${SONAR_ORGANIZATION:-}" ] && set -- "$@" "-Dsonar.organization=$SONAR_ORGANIZATION"
+[ -n "${SONAR_PROJECT_KEY:-}" ] && set -- "$@" "-Dsonar.projectKey=$SONAR_PROJECT_KEY"
 case "$kind" in
-  go) sonar-scanner -Dsonar.qualitygate.wait=true "-Dsonar.go.coverage.reportPaths=$absolute_report" ;;
-  frontend) sonar-scanner -Dsonar.qualitygate.wait=true "-Dsonar.javascript.lcov.reportPaths=$(dirname "$absolute_report")/lcov.info" ;;
+  go) sonar-scanner "$@" "-Dsonar.go.coverage.reportPaths=$absolute_report" ;;
+  frontend) sonar-scanner "$@" "-Dsonar.javascript.lcov.reportPaths=$(dirname "$absolute_report")/lcov.info" ;;
 esac

@@ -49,14 +49,27 @@ server status. Проверить, что серверный gate содержи
 (`autotests-ai-multistack-app-{backend-go-stdlib,frontend-typescript-vue,
 tests-java-junit5-rest_assured-selenide}`).
 
-**Токен — рекомендуемое хранилище.** Учащийся создаёт токен на
-https://sonar.qa.guru → My Account → Security → Generate Token и сохраняет его
-в файл `~/.config/sonar/sonar.qa.guru.token` с правами `chmod 600`. Файл живёт
-вне репозитория и переживает чистые checkout. Затем:
+**Провайдер — выбор при первичной настройке.** `sonar-env.sh` поддерживает два
+варианта через `SONAR_PROVIDER`:
+
+- `sonarqube` (по умолчанию) — self-hosted SonarQube; дефолтный хост
+  `https://sonar.qa.guru`, любой другой задаётся `SONAR_HOST_URL` до source.
+- `sonarcloud` — https://sonarcloud.io. Дополнительно требует
+  `SONAR_ORGANIZATION` (ключ вашей организации) и, если дефолтные ключи проектов
+  заняты чужой организацией, `SONAR_PROJECT_KEY` на каждый модуль.
 
 ```bash
-. tools/quality/sonar-env.sh   # экспортирует SONAR_* из token-файла, значение не печатается
+. tools/quality/sonar-env.sh                          # sonar.qa.guru
+SONAR_PROVIDER=sonarcloud SONAR_ORGANIZATION=my-org \
+  . tools/quality/sonar-env.sh                        # sonarcloud.io
 ```
+
+**Токен — рекомендуемое хранилище.** Учащийся создаёт токен на выбранном хосте
+→ My Account → Security → Generate Token и сохраняет его
+в файл `~/.config/sonar/<host>.token` с правами `chmod 600`
+(`sonar.qa.guru.token` или `sonarcloud.token`). Файл живёт
+вне репозитория и переживает чистые checkout. `sonar-env.sh` экспортирует
+`SONAR_*` из token-файла, значение не печатается.
 
 `sonar-env.sh` задаёт `SONAR_HOST_URL`, `SONAR_APPROVED_URL` и `SONAR_TOKEN`
 из файла `${SONAR_TOKEN_FILE:-~/.config/sonar/sonar.qa.guru.token}`.
