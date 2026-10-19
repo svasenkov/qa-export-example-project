@@ -49,7 +49,7 @@ server status. Проверить, что серверный gate содержи
 (`autotests-ai-multistack-app-{backend-go-stdlib,frontend-typescript-vue,
 tests-java-junit5-rest_assured-selenide}`).
 
-**Провайдер — выбор при первичной настройке.** `sonar-env.sh` поддерживает два
+**Провайдер — выбор при первичной настройке.** `sonar-env.sh` поддерживает три
 варианта через `SONAR_PROVIDER`:
 
 - `sonarqube` (по умолчанию) — self-hosted SonarQube; дефолтный хост
@@ -57,11 +57,15 @@ tests-java-junit5-rest_assured-selenide}`).
 - `sonarcloud` — https://sonarcloud.io. Дополнительно требует
   `SONAR_ORGANIZATION` (ключ вашей организации) и, если дефолтные ключи проектов
   заняты чужой организацией, `SONAR_PROJECT_KEY` на каждый модуль.
+- `custom` — любой другой сервер; обязателен явный `SONAR_HOST_URL`, токен
+  ищется в `~/.config/sonar/<host>.token` (или `SONAR_TOKEN_FILE`).
 
 ```bash
 . tools/quality/sonar-env.sh                          # sonar.qa.guru
 SONAR_PROVIDER=sonarcloud SONAR_ORGANIZATION=my-org \
   . tools/quality/sonar-env.sh                        # sonarcloud.io
+SONAR_PROVIDER=custom SONAR_HOST_URL=https://sonar.acme.tld \
+  . tools/quality/sonar-env.sh                        # свой сервер
 ```
 
 **Токен — рекомендуемое хранилище.** Учащийся создаёт токен на выбранном хосте

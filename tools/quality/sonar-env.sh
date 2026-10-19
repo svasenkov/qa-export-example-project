@@ -2,6 +2,8 @@
 # Source this file to prepare a local Sonar analysis environment:
 #   . tools/quality/sonar-env.sh                                # self-hosted (default)
 #   SONAR_PROVIDER=sonarcloud . tools/quality/sonar-env.sh      # sonarcloud.io
+#   SONAR_PROVIDER=custom SONAR_HOST_URL=https://sonar.acme.tld \
+#     . tools/quality/sonar-env.sh                              # any other server
 #
 # Providers:
 #   sonarqube  — self-hosted SonarQube (default https://sonar.qa.guru; override
@@ -9,6 +11,10 @@
 #   sonarcloud — https://sonarcloud.io; additionally requires SONAR_ORGANIZATION
 #                (your org key) and usually SONAR_PROJECT_KEY overrides, since
 #                the default project keys belong to the course organization.
+#   custom     — any other server; requires an explicit SONAR_HOST_URL. The
+#                token file is expected at ~/.config/sonar/<host>.token unless
+#                SONAR_TOKEN_FILE overrides it. Set SONAR_ORGANIZATION too if
+#                the server needs it (e.g. a SonarCloud-compatible proxy).
 #
 # Exports SONAR_HOST_URL, SONAR_APPROVED_URL, SONAR_PROVIDER and SONAR_TOKEN
 # without printing the token. Tokens live outside the repository in
@@ -31,15 +37,23 @@ case "$SONAR_PROVIDER" in
             echo "BLOCKED: sonarcloud requires SONAR_ORGANIZATION (your organization key)" >&2
             return 2 2>/dev/null || exit 2
         fi
-        export SONAR_ORGANIZATION
+        ;;
+    custom)
+        if [ -z "${SONAR_HOST_URL:-}" ]; then
+            echo "BLOCKED: custom provider requires an explicit SONAR_HOST_URL" >&2
+            return 2 2>/dev/null || exit 2
+        fi
+        custom_host=$(printf '%s' "$SONAR_HOST_URL" | sed -e 's|^[a-zA-Z][a-zA-Z0-9+.-]*://||' -e 's|[:/].*||')
+        SONAR_TOKEN_FILE=${SONAR_TOKEN_FILE:-"$HOME/.config/sonar/${custom_host}.token"}
         ;;
     *)
-        echo "BLOCKED: unknown SONAR_PROVIDER '$SONAR_PROVIDER' (sonarqube|sonarcloud)" >&2
+        echo "BLOCKED: unknown SONAR_PROVIDER '$SONAR_PROVIDER' (sonarqube|sonarcloud|custom)" >&2
         return 2 2>/dev/null || exit 2
         ;;
 esac
 SONAR_APPROVED_URL=$SONAR_HOST_URL
 export SONAR_HOST_URL SONAR_APPROVED_URL SONAR_PROVIDER
+[ -n "${SONAR_ORGANIZATION:-}" ] && export SONAR_ORGANIZATION
 
 if [ ! -f "$SONAR_TOKEN_FILE" ]; then
     echo "BLOCKED: Sonar token file is missing: $SONAR_TOKEN_FILE" >&2
