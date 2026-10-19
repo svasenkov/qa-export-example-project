@@ -136,9 +136,11 @@ class InfraClientsTest extends AllureMeta {
             MockScenarios.setState("health", "started");
             MockScenarios.resetAll();
         } else {
-            // Live backend has no WireMock admin — the calls must surface the 404.
-            assertThrows(AssertionError.class, () -> MockScenarios.setState("health", "x"));
-            assertThrows(AssertionError.class, MockScenarios::resetAll);
+            // No WireMock admin: a live backend answers 404 (AssertionError), an
+            // unreachable stand sneaky-throws ConnectException — either way the
+            // failure must surface, never pass silently.
+            assertThrows(Throwable.class, () -> MockScenarios.setState("health", "x"));
+            assertThrows(Throwable.class, MockScenarios::resetAll);
         }
     }
 

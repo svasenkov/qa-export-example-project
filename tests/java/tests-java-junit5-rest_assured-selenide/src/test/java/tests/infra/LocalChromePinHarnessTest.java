@@ -121,6 +121,8 @@ class LocalChromePinHarnessTest extends AllureMeta {
     @Test
     @DisplayName("apply resolves a fake install and the selenium cache driver")
     void applyResolvesFixturesAndCacheFallback() throws IOException {
+        System.setProperty("os.name", "Mac OS X");
+        System.setProperty("os.arch", "aarch64");
         System.setProperty(PIN_PROP, FAKE_VERSION);
         var driverCache = Path.of(System.getProperty("user.home"),
                 ".cache/selenium/chromedriver/mac-arm64", FAKE_VERSION, "chromedriver");
@@ -146,6 +148,8 @@ class LocalChromePinHarnessTest extends AllureMeta {
     @Test
     @DisplayName("apply reports a missing browser binary and a missing driver")
     void applyReportsMissingArtifacts() throws IOException {
+        System.setProperty("os.name", "Mac OS X");
+        System.setProperty("os.arch", "aarch64");
         System.setProperty(PIN_PROP, "148.0.7778.998");
         try {
             var noChrome = assertThrows(IllegalStateException.class,
@@ -169,6 +173,7 @@ class LocalChromePinHarnessTest extends AllureMeta {
         var version = "148.0.7778.997";
         try {
             // mac x64 — fake install so the driver lookup reaches the selenium cache path
+            System.setProperty("os.name", "Mac OS X");
             System.setProperty("os.arch", "x86_64");
             fakeInstall("mac", version, true, false);
             System.setProperty(PIN_PROP, version);

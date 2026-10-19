@@ -60,9 +60,10 @@ public final class AuthApiClient {
     public static void deleteAccountQuietly(String username, String password) {
         try {
             deleteAccount(login(username, password));
-        } catch (AssertionError | RuntimeException ignored) {
+        } catch (AssertionError | Exception ignored) {
             // The test that created the user is responsible for its own assertions;
-            // a failed cleanup (user never created, stand down) must not re-fail it.
+            // a failed cleanup (user never created, stand down, unreachable stand —
+            // RestAssured sneaky-throws checked IOExceptions) must not re-fail it.
         }
     }
 }

@@ -183,14 +183,18 @@ func scratchDatabase(t *testing.T, admin *sql.DB, name string) string {
 	return base.String()
 }
 
-// asRole rewrites a DSN to authenticate as the given role (trust auth — no password).
+// scratchRolePassword authenticates ad-hoc roles on clusters enforcing
+// scram-sha-256 (docker postgres with POSTGRES_PASSWORD); trust clusters ignore it.
+const scratchRolePassword = "qa-scratch-role-password"
+
+// asRole rewrites a DSN to authenticate as the given role with the fixture password.
 func asRole(t *testing.T, dsn, role string) string {
 	t.Helper()
 	parsed, err := url.Parse(dsn)
 	if err != nil {
 		t.Fatalf("dsn: %v", err)
 	}
-	parsed.User = url.User(role)
+	parsed.User = url.UserPassword(role, scratchRolePassword)
 	return parsed.String()
 }
 
@@ -350,7 +354,7 @@ func TestStartupFailsWithoutSchemaPrivileges(t *testing.T) {
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 	role := "qa_ro_" + suffix
 	database := "qa_boot_" + suffix
-	if _, err := admin.ExecContext(t.Context(), "CREATE ROLE "+role+" LOGIN"); err != nil {
+	if _, err := admin.ExecContext(t.Context(), "CREATE ROLE "+role+" LOGIN PASSWORD '"+scratchRolePassword+"'"); err != nil {
 		t.Fatalf("create role: %v", err)
 	}
 	t.Cleanup(func() {
@@ -380,7 +384,7 @@ func TestStartupFailsWhenSeedCannotWrite(t *testing.T) {
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 	role := "qa_ro_" + suffix
 	database := "qa_boot_" + suffix
-	if _, err := admin.ExecContext(t.Context(), "CREATE ROLE "+role+" LOGIN"); err != nil {
+	if _, err := admin.ExecContext(t.Context(), "CREATE ROLE "+role+" LOGIN PASSWORD '"+scratchRolePassword+"'"); err != nil {
 		t.Fatalf("create role: %v", err)
 	}
 	t.Cleanup(func() {

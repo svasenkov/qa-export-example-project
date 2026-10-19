@@ -233,6 +233,19 @@ jobs:
           key: gradle-cc-infra-tests-${{ hashFiles(format('{0}/*.gradle*', env.TESTS_DIR), format('{0}/gradle/wrapper/gradle-wrapper.properties', env.TESTS_DIR), format('{0}/gradle.properties', env.TESTS_DIR)) }}-${{ github.sha }}
           restore-keys: |
             gradle-cc-infra-tests-
+      - name: Read Chrome for Testing pin
+        id: chrome-pin
+        working-directory: ${{ env.TESTS_DIR }}
+        run: echo "version=$(bash scripts/install-chrome-for-testing.sh --print-version)" >> "$GITHUB_OUTPUT"
+      - name: Cache Chrome for Testing
+        continue-on-error: true
+        uses: actions/cache@v6
+        with:
+          path: ~/.local/share/chrome-for-testing
+          key: chrome-for-testing-pin-${{ runner.os }}-${{ runner.arch }}-${{ steps.chrome-pin.outputs.version }}
+      - name: Install pinned Chrome for Testing
+        working-directory: ${{ env.TESTS_DIR }}
+        run: bash scripts/install-chrome-for-testing.sh
       - name: Infra tests
         id: run-tests
         working-directory: ${{ env.TESTS_DIR }}
