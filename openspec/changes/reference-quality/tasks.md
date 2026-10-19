@@ -32,14 +32,17 @@
   требуют Pro/paid; готовый payload с 9 contexts и strict=true сохранён
   в artifacts/reference-2026-10-19-github-run/ для владельца.
 
+- [x] Согласовать полный product scope header/navigation/layout/catalog/PWA:
+  решения владельца 19.10 применены в change `product-scope` (каталог read-only,
+  поиск пассивный+backlog, Stage/Prod везде, dark/en/zds-* контракт,
+  axe-гейт двух уровней, PWA offline-smoke, Lighthouse отложен); реализация
+  покрыта — axe-браузер нашёл реальные дефекты, исправлены и перепроверены,
+  goldens пересняты на linux, CI 9/9 зелёный.
+- [x] Включить branch protection на main: применено 19.10 после смены
+  видимости репо на public — 9 required contexts, strict=true,
+  enforce_admins, linear history (branch-protection-applied.json).
+
 ## Не завершено — не архивировать как завершённое изменение
-- [ ] Согласовать полный product scope header/navigation/layout/catalog/PWA:
-  change `product-scope` оформлен и провалидирован (proposal, дельты app-shell/
-  catalog/service-status/pwa, design с открытыми вопросами, tasks); ждёт
-  утверждения владельцем. Уже реализованное покрыто тестами (поиск шапки,
-  пустой каталог, PWA-артефакты).
-- [ ] Включить branch protection на main: заблокировано тарифом GitHub
-  (403), решение и применение — за владельцем репозитория.
 - [ ] Выполнить переносимость в новой генерации (manifest↔tests/config/runtime
   реализовано и проверено; шаблон новой генерации не прогонялся).
 - [ ] Подключить разрешённый model runtime, выполнить независимые поведенческие
