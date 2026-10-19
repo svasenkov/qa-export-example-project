@@ -1,0 +1,13 @@
+{
+  "scenarioName": "items",
+  "requiredScenarioState": "empty",
+  "request": {
+    "method": "GET",
+    "url": "/api/items"
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": { "items": [], "source": "postgresql" }
+  }
+}

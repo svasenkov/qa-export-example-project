@@ -29,6 +29,14 @@ class HeaderTests extends TestBase {
 
     @Test
     @Tag("ui")
+    @DisplayName("Header search input keeps its identification attributes")
+    void headerSearchInputKeepsIdentificationAttributes() {
+        loginPage.openPage()
+                .header.shouldHaveSearchInput();
+    }
+
+    @Test
+    @Tag("ui")
     @DisplayName("Theme toggle persists light theme after reload")
     void themeTogglePersistsLightThemeAfterReload() {
         loginPage.openPage()

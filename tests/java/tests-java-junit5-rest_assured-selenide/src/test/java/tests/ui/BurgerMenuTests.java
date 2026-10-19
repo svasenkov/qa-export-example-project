@@ -40,6 +40,15 @@ class BurgerMenuTests extends TestBase {
 
     @Test
     @Tag("ui")
+    @DisplayName("Menu shows its own search input with identification attributes")
+    void menuShowsSearchInputWithIdentification() {
+        loginPage.openPage()
+                .header.openMenu()
+                .shouldHaveMenuSearchInput();
+    }
+
+    @Test
+    @Tag("ui")
     @DisplayName("Menu Register opens the register page and closes the menu")
     void clickingRegisterOpensRegisterAndClosesMenu() {
         loginPage.openPage()

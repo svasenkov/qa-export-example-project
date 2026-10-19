@@ -24,6 +24,8 @@ public class HeaderComponent {
             $("[data-testid='header-tools'] [data-testid='header-lang-label']");
     private final SelenideElement themeToggle =
             $("[data-testid='header-tools'] [data-testid='header-theme-toggle']");
+    private final SelenideElement searchInput = $("[data-testid='header-search-input']");
+    private final SelenideElement menuSearchInput = $("[data-testid='header-menu-search-input']");
     private final SelenideElement html = $("html");
 
     @Step("Emulate mobile viewport (375x812)")
@@ -103,6 +105,26 @@ public class HeaderComponent {
     @Step("Verify embedded header is mounted")
     public HeaderComponent shouldShowEmbeddedHeader() {
         root.shouldBe(visible);
+        return this;
+    }
+
+    @Step("Verify header search input keeps identification attributes")
+    public HeaderComponent shouldHaveSearchInput() {
+        searchInput.shouldBe(visible)
+                .shouldHave(attribute("id", "header-search-input"))
+                .shouldHave(attribute("name", "header-search"))
+                .shouldHave(attribute("type", "search"))
+                .shouldHave(attribute("autocomplete", "off"));
+        return this;
+    }
+
+    @Step("Verify menu search input keeps identification attributes")
+    public HeaderComponent shouldHaveMenuSearchInput() {
+        menuSearchInput.shouldBe(visible)
+                .shouldHave(attribute("id", "header-menu-search-input"))
+                .shouldHave(attribute("name", "header-menu-search"))
+                .shouldHave(attribute("type", "search"))
+                .shouldHave(attribute("autocomplete", "off"));
         return this;
     }
 
