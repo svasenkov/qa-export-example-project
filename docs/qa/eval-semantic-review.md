@@ -65,3 +65,56 @@
 ```
 Нет, отчёт нельзя засчитать, если исходник изменился после его создания. Отчёт должен быть привязан к конкретной версии кода и входам запуска, как указано в требованиях к аудиту покрытия.
 ```
+
+---
+
+# Модель gpt-oss:20b (artifacts/eval-dev-gptoss)
+
+## H-04 [gpt-oss] — verdict [ ] pass / [ ] fail
+
+```
+{"answer":"**Audit of `audit.test.mjs`**\n\n1. **Duplicate test** – The test named **`duplicate`** runs the exact same assertion as the **`positive`** test:\n   ```js\n   test('duplicate',()=>assert.equal(match('abc','abc'),true));\n   ```\n   This is redundant and should be removed or replaced with a distinct scenario.\n\n2. **Erroneous oracle** – The test named **`wrong oracle`** expects the function to return `true` for two different strings:\n   ```js\n   test('wrong oracle',()=>assert.equal(match('a'.repeat(72)+'x','a'.repeat(72)+'y'),true));\n   ```\n   The oracle is incorrect because the passwords differ (`…x` vs `…y`). The expected result should be `false`.\n\n**Recommendation**:\n- Remove or rename the duplicate test.\n- Correct the oracle in the `wrong oracle` test to `false`.\n- Optionally add a new test that verifies the function correctly rejects mismatched passwords.\n"}
+```
+
+## H-05 [gpt-oss] — verdict [ ] pass / [ ] fail
+
+```
+**Оценка пригодности каталога `evidence/` для подтверждения текущего запуска**
+
+| Файл | Статус | Что подтверждает | Что нужно проверить |
+|------|--------|------------------|---------------------|
+| `valid.json` | `pass` | Доказательство успешного выполнения тестов (два коротких пароля). | Сравнить `source_sha256` с хешем текущего кода. Если совпадает – доказательство актуально. |
+| `attempt‑1.json` | `pass` | Тот же результат, что и в `valid.json`. | Аналогично – проверить хеш. |
+| `attempt‑2.json` | `fail` | Отсутствует подтверждение. | Не используется. |
+| `attempt‑3.json` | `skip` | Пропущен. | Не используется. |
+| `attempt‑4.json` | `blocked` | Блокировка (например, недоступный сервис). | Не подтверждает. |
+| `attempt‑5.json` | `not_run` | Не выполнен. | Не подтверждает. |
+| `corrupt.json` | Пустой/невалидный JSON | Не содержит данных. | Не используется. |
+| `empty.json` | Пустой файл | Не содержит данных. | Не используется. |
+| `stale.json` | `pass` | Старый результат (hash `old`). | Явно устаревший – не подтверждает текущий запуск. |
+| `statuses.json` | Список всех попыток | Полный обзор статусов. | Полезно для аудита, но не подтверждает актуальность. |
+
+### Итог
+
+- **Подтверждающее доказательство** – `valid.json` (и `attempt‑1.json`).  
+  Если хеш `source_sha256` совпадает с хешем текущего кода, то каталог `evidence/` содержит корректное подтверждение успешного запуска.  
+- **Устаревшие/неактуальные файлы** – `stale.json`, `corrupt.json`, `empty.json`, а также все фа
+```
+
+## H-09 [gpt-oss] — verdict [ ] pass / [ ] fail
+
+```
+**Итог**
+
+- **Runtime недоступен** – в текущей среде нет запущенного раннера, необходимого для выполнения тестов. Это ограничивает возможность запуска и проверки тестов, а также получения результатов покрытия и статуса сборки.
+
+- **SonarQube‑анализ незавершён** – анализ кода в SonarQube не завершён, поэтому нет актуальных метрик покрытия, статических ошибок и других метрик качества. Это препятствует оценке качества кода и выявлению потенциальных дефектов.
+
+**Рекомендации**
+
+1. **Запустить/подключить runtime** – убедиться, что выбранный стек (Go‑stdlib для backend, TypeScript‑Vue для frontend, Java‑JUnit5‑RestAssured‑Selenide для тестов) корректно настроен и доступен.  
+2. **Завершить SonarQube‑анализ** – проверить конфигурацию CI/CD, убедиться, что SonarScanner запускается и получает доступ к репозиторию. После завершения анализа можно получить отчёт о покрытии, найденных ошибках и метриках качества.  
+3. **После запуска** – повторить аудит покрытия (skill `qa-coverage-audit`) и запуск тестов (skill `qa-run-tests`) для подтверждения корректности и полноты покрытия требований.
+
+Если возникнут вопросы по настройке или возникнут проблемы с запуском, дайте знать – помогу с конкретными командами и настройками.
+```
